@@ -118,7 +118,8 @@ if 'g_gen.h5' in os.listdir('weights/') and 'g_disc.h5' in os.listdir('weights/'
     
 
 ppgn = PPGN.NoiselessJointPPGN(model, 6, 7, 8, verbose=2,
-                               gan_generator=g_gen, gan_discriminator=g_disc)
+                               gan_generator='Default', gan_discriminator='Default')
+#                               gan_generator=g_gen, gan_discriminator=g_disc)
 ppgn.compile(clf_metrics=['accuracy'],
              gan_loss_weight=[1, 2, 1e-1])
 if not skipFitClf:
@@ -126,7 +127,7 @@ if not skipFitClf:
     ppgn.classifier.save_weights('weights/clf.h5')
 
 if not skipFitGAN:
-    src, gen = ppgn.fit_gan(x_train, epochs=2500, report_freq=100, train_procedure=customGANTrain)
+    src, gen = ppgn.fit_gan(x_train, epochs=2500, report_freq=100)#, train_procedure=customGANTrain)
     ppgn.g_gen.save_weights('weights/g_gen.h5')
     ppgn.g_disc.save_weights('weights/g_disc.h5')
 
@@ -151,8 +152,11 @@ if not skipFitGAN:
 #h2_base = ppgn.enc2.predict(ppgn.enc1.predict(x_test[0:1]))
 h2_base=None
 for i in range(10):
-    samples, h2 = ppgn.sample(i, nbSamples=100, h2_start=h2_base, epsilons=(1e1, 1, 1e-15))
-    h2_base = h2[-1]
+    samples, h2 = ppgn.sample(i, nbSamples=100,
+                              h2_start=h2_base,
+                              epsilons=(1e-2, 1, 1e-15),
+                              lr=1e24, lr_end=1e24)
+    h2_base = None#h2[-1]
     img = (np.concatenate((samples), axis=0)+1)*255/2
     img[img < 0  ] = 0
     img[img > 255] = 255

@@ -287,6 +287,7 @@ class NoiselessJointPPGN:
 
         return (source_samples, generated_samples)
 
+
     def sample(self, neuronID, epsilons=(1e-11, 1, 1e-17), nbSamples=100, h2_start=None, report_freq=10):
         #Draw a random starting point if needed
         if h2_start is None:
@@ -312,19 +313,25 @@ class NoiselessJointPPGN:
         h2 = h2_start
         samples = []
         for s in range(nbSamples):
+            step_size = lr + ((lr_end - lr) * s) / nbSamples
             #term0 is the reconstruction error of  h2
             term0 = self.enc2.predict(self.enc1.predict(self.g_gen.predict(h2)))
             term0 *= epsilons[0]
+            self._log("L2-norm of term0={}".format(np.linalg.norm(term0)), 2)
+
 
             #term1 is the gradient after a fwd/bwd pass
             term1 = fwd_bwd_pass([h2])[0]
             term1 *= epsilons[1]
+            self._log("L2-norm of term1={}".format(np.linalg.norm(term1)), 2)
 
             #term2 is just noise
             term2 = np.random.normal(0, epsilons[2]**2, h2.shape)
 
             h2_old = h2
-            h2 = h2_old + term0 + term1 + term2
+            #h2 = h2_old + term0 + term1 + term2
+            d_h = term0 + term1 + term2
+            h2 += step_size/np.abs(d_h).mean() * d_h
 
             if report_freq != -1 and s % report_freq == 0:
                 self._log('Sample #{}. h diff: {:.2f}, img diff: {:.2f}'\
