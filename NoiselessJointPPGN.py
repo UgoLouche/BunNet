@@ -307,8 +307,9 @@ class NoiselessJointPPGN:
         #Also see https://github.com/keras-team/keras/issues/2226
         conditional = K.log(self.sampler.outputs[0][:,neuronID])
         input_h2 = self.sampler.inputs[0]
+        learning_phase = K.learning_phase()
         grads = K.gradients(conditional, [input_h2])
-        fwd_bwd_pass = K.function([input_h2], grads)
+        fwd_bwd_pass = K.function([input_h2, learning_phase], grads)
 
         h2 = h2_start
         samples = []
@@ -321,7 +322,7 @@ class NoiselessJointPPGN:
 
 
             #term1 is the gradient after a fwd/bwd pass
-            term1 = fwd_bwd_pass([h2])[0]
+            term1 = fwd_bwd_pass([h2, 0])[0]
             term1 *= epsilons[1]
             self._log("L2-norm of term1={}".format(np.linalg.norm(term1)), 2)
 
