@@ -317,7 +317,7 @@ class NoiselessJointPPGN:
         for s in range(nbSamples):
             step_size = lr + ((lr_end - lr) * s) / nbSamples
             #term0 is the reconstruction error of  h2
-            term0 = self.enc2.predict(self.enc1.predict(self.g_gen.predict(h2)))
+            term0 = self.enc2.predict(self.enc1.predict(self.g_gen.predict(h2))) - h2
             term0 *= epsilons[0]
             self._log("L2-norm of term0={}".format(np.linalg.norm(term0)), 2)
 
