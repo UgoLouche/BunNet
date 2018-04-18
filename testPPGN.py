@@ -103,23 +103,25 @@ g_disc.add(Flatten())
 g_disc.add(Dense(1, activation='linear'))
 g_disc.trainable=True
 
+#Create ppgn BEFORE assigning loaded weights
+ppgn = PPGN.NoiselessJointPPGN(model, 6, 7, 8, verbose=2,
+                               gan_generator='Default', gan_discriminator='Default')
+#                               gan_generator=g_gen, gan_discriminator=g_disc)
+
 #Load weights and skip fit if possible
 skipFitClf=False
 skipFitGAN=False
 if 'clf.h5' in os.listdir('weights/'):
-    model.load_weights('weights/clf.h5')
+    ppgn.classifier.load_weights('weights/clf.h5')
     skipFitClf=True
     print('Loaded CLF weights from existing file, will skip training')
 if 'g_gen.h5' in os.listdir('weights/') and 'g_disc.h5' in os.listdir('weights/'):
-    g_gen.load_weights('weights/g_gen.h5')
-    g_disc.load_weights('weights/g_disc.h5')
+    ppgn.g_gen.load_weights('weights/g_gen.h5')
+    ppgn.g_disc.load_weights('weights/g_disc.h5')
     skipFitGAN=True
     print('Loaded GAN weights from existing file, will skip training')
     
 
-ppgn = PPGN.NoiselessJointPPGN(model, 6, 7, 8, verbose=2,
-                               gan_generator='Default', gan_discriminator='Default')
-#                               gan_generator=g_gen, gan_discriminator=g_disc)
 ppgn.compile(clf_metrics=['accuracy'],
              gan_loss_weight=[1, 2, 1e-1])
 if not skipFitClf:
@@ -152,7 +154,7 @@ if not skipFitGAN:
 #h2_base = ppgn.enc2.predict(ppgn.enc1.predict(x_test[0:1]))
 h2_base=None
 for i in range(10):
-    samples, h2 = ppgn.sample(i, nbSamples=100,
+    samples, h2 = ppgn.sample(i, nbSamples=20,
                               h2_start=h2_base,
                               epsilons=(1e-2, 1, 1e-15),
                               lr=1e24, lr_end=1e24, use_lr=False)
