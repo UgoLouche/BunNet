@@ -418,8 +418,11 @@ class NoiselessJointPPGN:
 
 
     def _print_summary(self, model, name):
-        self._log('Printing summary for '+name, 3)
-        model.summary()#print_fn=lambda x: self._log(x, 3))
+        if keras.__version__ >= '2.1.5':
+            self._log('Printing summary for '+name, 3)
+            model.summary(print_fn=lambda x: self._log(x, 3))
+        else:
+            model.summary()
         return
 
 
