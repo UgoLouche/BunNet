@@ -288,7 +288,8 @@ class NoiselessJointPPGN:
         return (source_samples, generated_samples)
 
 
-    def sample(self, neuronID, epsilons=(1e-11, 1, 1e-17), nbSamples=100, h2_start=None, report_freq=10):
+    def sample(self, neuronID, epsilons=(1e-11, 1, 1e-17), nbSamples=100, h2_start=None, report_freq=10,
+               lr=1e24, lr_end=1e24, use_lr=True):
         #Draw a random starting point if needed
         if h2_start is None:
             h2_start = np.random.normal(0, 1, self.sampler.input_shape[1:])
@@ -332,7 +333,8 @@ class NoiselessJointPPGN:
             h2_old = h2
             #h2 = h2_old + term0 + term1 + term2
             d_h = term0 + term1 + term2
-            h2 += step_size/np.abs(d_h).mean() * d_h
+            d_h_coeff = step_size/np.abs(d_h).mean() if use_lr else 1
+            h2 += d_h_coeff * d_h
 
             if report_freq != -1 and s % report_freq == 0:
                 self._log('Sample #{}. h diff: {:.2f}, img diff: {:.2f}'\

@@ -155,7 +155,7 @@ for i in range(10):
     samples, h2 = ppgn.sample(i, nbSamples=100,
                               h2_start=h2_base,
                               epsilons=(1e-2, 1, 1e-15),
-                              lr=1e24, lr_end=1e24)
+                              lr=1e24, lr_end=1e24, use_lr=False)
     h2_base = None#h2[-1]
     img = (np.concatenate((samples), axis=0)+1)*255/2
     img[img < 0  ] = 0
