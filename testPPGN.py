@@ -20,17 +20,18 @@ from keras.layers import Input, UpSampling2D, Conv2DTranspose,  Reshape
 #where disc is trained 100 times
 #Based on implementation found in https://github.com/hesampakdaman/ppgn-disc/blob/master/src/vanilla.py
 def customGANTrain(x_train, h1_train, batch_size, disc_model, gan_model, epochID):    
-    disc_train = 100 if epochID < 25 or epochID % 500 else 5
+    disc_train = 100 if (epochID < 25 or epochID % 500) else 5
     
     #train disc
-    idX = np.random.randint(0, x_train.shape[0], disc_train)
-
-    valid = x_train[idX]
-    fake  = gan_model.predict(x_train[idX])[0]
-    x_disc = np.concatenate((valid, fake), axis=0)
-    y_disc = np.concatenate((np.ones((disc_train)), np.zeros((disc_train))))
-
-    disc_loss = disc_model.train_on_batch(x_disc, y_disc)
+    for i in range(disc_train):
+        idX = np.random.randint(0, x_train.shape[0], batch_size)
+    
+        valid = x_train[idX]
+        fake  = gan_model.predict(x_train[idX])[0]
+        x_disc = np.concatenate((valid, fake), axis=0)
+        y_disc = np.concatenate((np.ones((batch_size)), np.zeros((batch_size))))
+    
+        disc_loss = disc_model.train_on_batch(x_disc, y_disc)
         
     #train gen
     x_gan = x_train[idX][-1:]
@@ -105,8 +106,8 @@ g_disc.trainable=True
 
 #Create ppgn BEFORE assigning loaded weights
 ppgn = PPGN.NoiselessJointPPGN(model, 6, 7, 8, verbose=2,
-                               gan_generator='Default', gan_discriminator='Default')
-#                               gan_generator=g_gen, gan_discriminator=g_disc)
+                               #gan_generator='Default', gan_discriminator='Default')
+                               gan_generator=g_gen, gan_discriminator=g_disc)
 
 #Load weights and skip fit if possible
 skipFitClf=False
@@ -129,7 +130,7 @@ if not skipFitClf:
     ppgn.classifier.save_weights('weights/clf.h5')
 
 if not skipFitGAN:
-    src, gen = ppgn.fit_gan(x_train, epochs=2500, report_freq=100)#, train_procedure=customGANTrain)
+    src, gen = ppgn.fit_gan(x_train, epochs=5000, report_freq=100, train_procedure=customGANTrain)
     ppgn.g_gen.save_weights('weights/g_gen.h5')
     ppgn.g_disc.save_weights('weights/g_disc.h5')
 
@@ -151,14 +152,15 @@ if not skipFitGAN:
         img[img > 255] = 255
         cv2.imwrite('img/gan{}.bmp'.format(i), img)
 
-#h2_base = ppgn.enc2.predict(ppgn.enc1.predict(x_test[0:1]))
+#h2_base = ppgn.enc2.predict(ppgn.enc1.predict(x_test[1:2]))
+#h2_base = ppgn.enc2.predict(ppgn.enc1.predict(x_train[1:2]))
 h2_base=None
 for i in range(10):
-    samples, h2 = ppgn.sample(i, nbSamples=20,
+    samples, h2 = ppgn.sample(i, nbSamples=200,
                               h2_start=h2_base,
                               epsilons=(1e-2, 1, 1e-15),
                               lr=1e24, lr_end=1e24, use_lr=False)
-    h2_base = None#h2[-1]
+    h2_base = h2[-1]#None#
     img = (np.concatenate((samples), axis=0)+1)*255/2
     img[img < 0  ] = 0
     img[img > 255] = 255
