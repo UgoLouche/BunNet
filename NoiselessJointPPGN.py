@@ -257,7 +257,8 @@ class NoiselessJointPPGN:
         return
 
 
-    def fit_gan(self, x_train, batch_size=64, epochs=30000,
+    def fit_gan(self, x_train, batch_size=64, 
+                epochs=30000, starting_epoch=0,
                 report_freq=500, train_procedure='Default'):
         if train_procedure == 'Default':
             train_procedure = self._defaultGANTrainProcedure
@@ -268,7 +269,7 @@ class NoiselessJointPPGN:
         self.gan_loss = []
         source_samples = []
         generated_samples = []
-        for e in range(epochs):
+        for e in np.arange(starting_epoch, epochs):
             (dl, gl) = train_procedure(x_train, h1_train, batch_size, self.g_disc, self.gan, e)
             self.g_disc_loss.append(dl)
             self.gan_loss.append(gl)
