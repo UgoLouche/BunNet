@@ -16,35 +16,34 @@ from keras.layers import Conv2D, MaxPooling2D
 from keras.layers import Input, UpSampling2D, Conv2DTranspose,  Reshape
 
 ## Definbe custom GAN training procedure based on http://www.nada.kth.se/~ann/exjobb/hesam_pakdaman.pdf
-#Do 5 disc iterations for one gan iteration. Except for the 500 first epoch and every 500 subsequent epochs 
+#Do 5 disc iterations for one gan iteration. Except for the 500 first epoch and every 500 subsequent epochs
 #where disc is trained 100 times
 #Based on implementation found in https://github.com/hesampakdaman/ppgn-disc/blob/master/src/vanilla.py
-def customGANTrain(x_train, h1_train, batch_size, disc_model, gan_model, epochID):    
+def customGANTrain(x_train, h1_train, batch_size, disc_model, gan_model, epochID):
     disc_train = 100 if (epochID < 25 or epochID % 500) else 5
-    
+
     #train disc
     for i in range(disc_train):
         idX = np.random.randint(0, x_train.shape[0], batch_size)
-    
+
         valid = x_train[idX]
         fake  = gan_model.predict(x_train[idX])[0]
         x_disc = np.concatenate((valid, fake), axis=0)
         y_disc = np.concatenate((np.ones((batch_size)), np.zeros((batch_size))))
-    
+
         disc_loss = disc_model.train_on_batch(x_disc, y_disc)
-        
+
     #train gen
     x_gan = x_train[idX][-1:]
     y_gan = np.ones((1))
     h1_gan = h1_train[idX][-1:]
 
     gan_loss = gan_model.train_on_batch(x_gan, [x_gan, y_gan, h1_gan])
-    
+
     return (disc_loss, gan_loss)
 
 
 #Test on MNIST for now
-
 batch_size = 32
 num_classes = 10
 epochs = 15
@@ -121,7 +120,7 @@ if 'g_gen.h5' in os.listdir('weights/') and 'g_disc.h5' in os.listdir('weights/'
     ppgn.g_disc.load_weights('weights/g_disc.h5')
     skipFitGAN=True
     print('Loaded GAN weights from existing file, will skip training')
-    
+
 
 ppgn.compile(clf_metrics=['accuracy'],
              gan_loss_weight=[1, 2, 1e-1])
@@ -143,7 +142,7 @@ if not skipFitGAN:
     plt.figure()
     plt.plot(np.array(ppgn.gan_loss))
     plt.legend(['total loss', 'img loss', 'gan loss', 'h loss'])
-    
+
     for i in range(len(src)):
         src[i] = np.concatenate((src[i]), axis=0)
         gen[i] = np.concatenate((gen[i]), axis=0)
