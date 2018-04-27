@@ -105,19 +105,19 @@ g_disc.trainable=True
 
 #Create ppgn BEFORE assigning loaded weights
 ppgn = PPGN.NoiselessJointPPGN(model, 6, 7, 8, verbose=2,
-                               #gan_generator='Default', gan_discriminator='Default')
-                               gan_generator=g_gen, gan_discriminator=g_disc)
+                               gan_generator='Default', gan_discriminator='Default')
+                               #gan_generator=g_gen, gan_discriminator=g_disc)
 
 #Load weights and skip fit if possible
 skipFitClf=False
 skipFitGAN=False
-if 'clf.h5' in os.listdir('weights/'):
-    ppgn.classifier.load_weights('weights/clf.h5')
+if 'clf_mnist.h5' in os.listdir('weights/'):
+    ppgn.classifier.load_weights('weights/clf_mnist.h5')
     skipFitClf=True
     print('Loaded CLF weights from existing file, will skip training')
-if 'g_gen.h5' in os.listdir('weights/') and 'g_disc.h5' in os.listdir('weights/'):
-    ppgn.g_gen.load_weights('weights/g_gen.h5')
-    ppgn.g_disc.load_weights('weights/g_disc.h5')
+if 'g_gen_mnist.h5' in os.listdir('weights/') and 'g_disc_mnist.h5' in os.listdir('weights/'):
+    ppgn.g_gen.load_weights('weights/g_gen_mnist.h5')
+    ppgn.g_disc.load_weights('weights/g_disc_mnist.h5')
     skipFitGAN=True
     print('Loaded GAN weights from existing file, will skip training')
 
@@ -126,12 +126,12 @@ ppgn.compile(clf_metrics=['accuracy'],
              gan_loss_weight=[1, 2, 1e-1])
 if not skipFitClf:
     ppgn.fit_classifier(x_train, y_train, validation_data=[x_test, y_test], epochs=15)
-    ppgn.classifier.save_weights('weights/clf.h5')
+    ppgn.classifier.save_weights('weights/clf_mnist.h5')
 
 if not skipFitGAN:
-    src, gen = ppgn.fit_gan(x_train, epochs=5000, report_freq=100, train_procedure=customGANTrain)
-    ppgn.g_gen.save_weights('weights/g_gen.h5')
-    ppgn.g_disc.save_weights('weights/g_disc.h5')
+    src, gen = ppgn.fit_gan(x_train, epochs=5000, report_freq=100)#, train_procedure=customGANTrain)
+    ppgn.g_gen.save_weights('weights/g_gen_mnist.h5')
+    ppgn.g_disc.save_weights('weights/g_disc_mnist.h5')
 
     #Plot some GAN metrics computed during fit
     plt.ion()
@@ -153,13 +153,23 @@ if not skipFitGAN:
 
 #h2_base = ppgn.enc2.predict(ppgn.enc1.predict(x_test[1:2]))
 #h2_base = ppgn.enc2.predict(ppgn.enc1.predict(x_train[1:2]))
-h2_base=None
+#x_base = x_train
+#h2_base=ppgn.enc2.predict(ppgn.enc1.predict())
+target_class = 0
+selector = (y_train[:, target_class]==1).nonzero()[0][0]
+x_base = x_train[selector:selector+1]
+h2_base = ppgn.enc2.predict(ppgn.enc1.predict(x_base))#h2[-1]#None#
 for i in range(10):
-    samples, h2 = ppgn.sample(i, nbSamples=200,
+    samples, h2 = ppgn.sample(i, nbSamples=500,
                               h2_start=h2_base,
                               epsilons=(1e-2, 1, 1e-15),
                               lr=1e24, lr_end=1e24, use_lr=False)
-    h2_base = h2[-1]#None#
+    target_class = i+1 if i < 9 else 9
+    selector = (y_train[:, target_class]==1).nonzero()[0][0]
+    x_base = x_train[selector:selector+1]
+    h2_base = ppgn.enc2.predict(ppgn.enc1.predict(x_base))
+    h2_base = h2[-1]
+    #None#
     img = (np.concatenate((samples), axis=0)+1)*255/2
     img[img < 0  ] = 0
     img[img > 255] = 255
