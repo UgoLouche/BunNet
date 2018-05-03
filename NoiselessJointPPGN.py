@@ -174,7 +174,7 @@ class NoiselessJointPPGN:
         for i in np.arange(1, self.out_ind+1, 1):
             sampler_output = self.classifier.get_layer(index=i)(sampler_output)
         #flatten the output if not flat already
-        if K.ndim(sampler_output) >= 3: 
+        if K.ndim(sampler_output) >= 3:
             sampler_output = Flatten()(sampler_output)
         self.sampler = Model(inputs=sampler_input, outputs=sampler_output)
         self.sampler.trainable = False
@@ -257,7 +257,7 @@ class NoiselessJointPPGN:
         return
 
 
-    def fit_gan(self, x_train, batch_size=64, 
+    def fit_gan(self, x_train, batch_size=64,
                 epochs=30000, starting_epoch=0,
                 report_freq=500, train_procedure='Default'):
         if train_procedure == 'Default':
@@ -277,9 +277,9 @@ class NoiselessJointPPGN:
             #Produce a report
             if report_freq!=-1 and e%report_freq==0:
                 self._log('fit_gan -- Epoch #{} report'.format(e), 0)
-                self._log('GAN losses -- disc: {:.2f} // gen: {:.2f}'\
+                self._log('GAN losses -- disc: {:.8e} // gen: {:.8e}'\
                           .format(self.g_disc_loss[-1], self.gan_loss[-1][2]), 0)
-                self._log('Reconstruction losses -- img: {:.2f} // h1: {:.2f}'\
+                self._log('Reconstruction losses -- img: {:.2e} // h1: {:.8e}'\
                           .format(self.gan_loss[-1][1], self.gan_loss[-1][3]), 0)
                 #Generate a bunch of sample to return
                 idX = np.random.randint(0, x_train.shape[0], 25)

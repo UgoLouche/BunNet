@@ -105,8 +105,8 @@ g_disc.trainable=True
 
 #Create ppgn BEFORE assigning loaded weights
 ppgn = PPGN.NoiselessJointPPGN(model, 6, 7, 8, verbose=2,
-                               gan_generator='Default', gan_discriminator='Default')
-                               #gan_generator=g_gen, gan_discriminator=g_disc)
+                               #gan_generator='Default', gan_discriminator='Default')
+                               gan_generator=g_gen, gan_discriminator=g_disc)
 
 #Load weights and skip fit if possible
 skipFitClf=False

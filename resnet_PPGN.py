@@ -15,22 +15,33 @@ from keras.layers import Dense, Dropout, Flatten
 from keras.layers import Conv2D, MaxPooling2D
 from keras.layers import Input, UpSampling2D, Conv2DTranspose,  Reshape
 
+import six
+from keras.models import Model
+from keras.layers import (
+    Input,
+    Activation,
+    Dense,
+    Flatten
+)
+from keras.layers.convolutional import (
+    Conv2D,
+    MaxPooling2D,
+    AveragePooling2D
+)
+from keras.layers.merge import add
+from keras.layers.normalization import BatchNormalization
+from keras.regularizers import l2
+from keras import backend as K
+
 from __future__ import print_function, division
 
 from keras.datasets import mnist
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.convolutional import UpSampling2D, Conv2D, Convolution2D
-
+from keras.layers.convolutional import UpSampling2D, Conv2D
 from keras.models import Sequential, Model
 from keras.optimizers import Adam
-from keras_adversarial.legacy import l1l2
-from keras_adversarial.legacy import Dense, BatchNormalization, AveragePooling2D
-from keras_adversarial.image_grid_callback import ImageGridCallback
-from keras_adversarial import AdversarialModel, simple_gan, gan_targets
-from keras_adversarial import AdversarialOptimizerSimultaneous, normal_latent_sampling
-from image_utils import dim_ordering_shape
 
 import matplotlib.pyplot as plt
 
@@ -38,7 +49,7 @@ import sys
 
 import numpy as np
 
-from keras.applications import VGG16
+from externals import  resnet
 
 ## Definbe custom GAN training procedure based on http://www.nada.kth.se/~ann/exjobb/hesam_pakdaman.pdf
 #Do 5 disc iterations for one gan iteration. Except for the 500 first epoch and every 500 subsequent epochs
@@ -46,7 +57,7 @@ from keras.applications import VGG16
 #Based on implementation found in https://github.com/hesampakdaman/ppgn-disc/blob/master/src/vanilla.py
 def customGANTrain(x_train, h1_train, batch_size, disc_model, gan_model, epochID):
     disc_train = 100 if (epochID < 25 or epochID % 500) else 5
-    disc_loss, disc_pred = [], []
+
     #train disc
     for i in range(disc_train):
         idX = np.random.randint(0, x_train.shape[0], batch_size)
@@ -56,10 +67,8 @@ def customGANTrain(x_train, h1_train, batch_size, disc_model, gan_model, epochID
         x_disc = np.concatenate((valid, fake), axis=0)
         y_disc = np.concatenate((np.ones((batch_size)), np.zeros((batch_size))))
 
-        disc_loss.append(disc_model.train_on_batch(x_disc, y_disc))
-        disc_pred.append(disc_model.predict(x_disc).mean())
+        disc_loss = disc_model.train_on_batch(x_disc, y_disc)
 
-    print('GAN/Disc predictions {}'.format(np.mean(disc_pred)))
     #train gen
     x_gan = x_train[idX][-1:]
     y_gan = np.ones((1))
@@ -67,14 +76,57 @@ def customGANTrain(x_train, h1_train, batch_size, disc_model, gan_model, epochID
 
     gan_loss = gan_model.train_on_batch(x_gan, [x_gan, y_gan, h1_gan])
 
-    return (np.mean(disc_loss), gan_loss)
+    return (disc_loss, gan_loss)
+
+
+# GAN training procedure based on A. Dosovitskiy and T. Brox (NIPS 2016)
+# Generating Images with Perceptual Similarity Metrics based on Deep Networks
+# Reference and code available at https://lmb.informatik.uni-freiburg.de/Publications/2016/DB16c/
+# train_disc, train_gen = True, True
+# discr_loss_ratio = None
+# def DeepSIM_GANTrain(x_train, h1_train, batch_size, disc_model, gan_model, epochID):
+#     disc_train = 100 if epochID < 25 or epochID % 500 else 5
+#
+#     #train disc
+#     idX = np.random.randint(0, x_train.shape[0], disc_train)
+#
+#     valid = x_train[idX]
+#     fake  = gan_model.predict(x_train[idX])[0]
+#     x_disc = np.concatenate((valid, fake), axis=0)
+#     y_disc = np.concatenate((np.ones((disc_train)), np.zeros((disc_train))))
+#     disc_loss = disc_model.train_on_batch(x_disc, y_disc)
+#
+#     #train gen
+#     x_gan = x_train[idX][-1:]
+#     y_gan = np.ones((1))
+#     h1_gan = h1_train[idX][-1:]
+#
+#     gan_loss = gan_model.train_on_batch(x_gan, [x_gan, y_gan, h1_gan])
+#     discr_loss_ratio =
+#     # Perceptual Loss ratio
+#     return (disc_loss, gan_loss)
+
+# discr_loss_ratio = (discr_real_loss + discr_fake_loss) / discr_fake_for_generator_loss
+# if discr_loss_ratio < 1e-1 and train_discr:
+#   train_discr = False
+#   train_gen = True
+#   print "<<< real_loss=%e, fake_loss=%e, fake_loss_for_generator=%e, train_discr=%d, train_gen=%d >>>" % (discr_real_loss, discr_fake_loss, discr_fake_for_generator_loss, train_discr, train_gen)
+# if discr_loss_ratio > 5e-1 and not train_discr:
+#   train_discr = True
+#   train_gen = True
+#   print " <<< real_loss=%e, fake_loss=%e, fake_loss_for_generator=%e, train_discr=%d, train_gen=%d >>>" % (discr_real_loss, discr_fake_loss, discr_fake_for_generator_loss, train_discr, train_gen)
+# if discr_loss_ratio > 1e1 and train_gen:
+#   train_gen = False
+#   train_discr = True
+#   print "<<< real_loss=%e, fake_loss=%e, fake_loss_for_generator=%e, train_discr=%d, train_gen=%d >>>" % (discr_real_loss, discr_fake_loss, discr_fake_for_generator_loss, train_discr, train_gen)
+
 
 #Test on dataset les Feuilles
 batch_size = 64
 num_classes = 14
 epochs = 15
 # input image dimensions
-img_rows, img_cols = 64, 64
+img_rows, img_cols = 28, 28
 data_path = '/home/romain/Projects/cda_bn2018/data/h5py/'
 fname = '/gray_%ix%i.hdf5' %(img_rows, img_cols)
 #Get the data and reshape/convert/normalize
@@ -108,13 +160,13 @@ img_scale = x_train.std()
 # img_mean  = sc.mean_.reshape(img_rows, img_cols, 1)
 # img_scale = sc.scale_.reshape(img_rows, img_cols, 1)
 
-x_train = (x_train - img_mean) / img_scale
-x_test = (x_test - img_mean) / img_scale
+# x_train = (x_train - img_mean) / img_scale
+# x_test = (x_test - img_mean) / img_scale
 
 # or take the min/max over each channel and normalize
 # Here it just means we divide by 256
-#x_train = ((x_train/255) - 0.5)*2
-#x_test =  ((x_test/255) - 0.5)*2
+x_train = ((x_train/255) - 0.5)*2
+x_test =  ((x_test/255) - 0.5)*2
 
 #categorical y
 y_train = keras.utils.to_categorical(y_train, num_classes)
@@ -131,134 +183,68 @@ y_test = keras.utils.to_categorical(y_test, num_classes)
 # model.add(Dense(64, activation='relu'))
 # model.add(Dense(num_classes, activation='softmax'))
 # model.trainable=True
-def vgg16_model(img_rows, img_cols, channel=1, num_classes=None):
-    """VGG 16 Model for Keras
-    Model Schema is based on
-    https://gist.github.com/baraldilorenzo/07d7802847aaad0a35d3
-    ImageNet Pretrained Weights
-    https://drive.google.com/file/d/0Bz7KyqmuGsilT0J5dmRCM0ROVHc/view?usp=sharing
-    Parameters:
-      img_rows, img_cols - resolution of inputs
-      channel - 1 for grayscale, 3 for color
-      num_classes - number of categories for our classification task
-    """
-    model = Sequential()
-    model.add(ZeroPadding2D((1, 1), input_shape=(img_rows, img_cols, channel)))
-    model.add(Convolution2D(64, (3, 3), activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(64, (3, 3), activation='relu'))
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+model  = resnet.ResnetBuilder.build_resnet_34(input_shape, 14)
 
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(128, (3, 3), activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(128, (3, 3), activation='relu'))
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+# g_gen = Sequential()
+# g_gen.add(Dense(1600, activation='relu', input_shape=(64,)))
+# g_gen.add(Reshape((5,5,64)))
+# g_gen.add(Conv2DTranspose(512, (5,5),   activation='relu', padding='valid'))
+# g_gen.add(Conv2DTranspose(256, (5,5),   activation='relu', padding='valid'))
+# g_gen.add(Conv2DTranspose(256, (7,7),   activation='relu', padding='valid'))
+# g_gen.add(Conv2DTranspose(1,   (10,10), activation='linear', padding='valid'))
+# g_gen.trainable=True
+g_gen = Sequential()
+g_gen.add(Dense(128 * 7 * 7, activation="relu", input_shape=(1,1,512)))
+g_gen.add(Reshape((7, 7, 128)))
+g_gen.add(BatchNormalization(momentum=0.8))
+g_gen.add(UpSampling2D())
+g_gen.add(Conv2D(128, kernel_size=3, padding="same"))
+g_gen.add(Activation("relu"))
+g_gen.add(BatchNormalization(momentum=0.8))
+g_gen.add(UpSampling2D())
+g_gen.add(Conv2D(64, kernel_size=3, padding="same"))
+g_gen.add(Activation("relu"))
+g_gen.add(BatchNormalization(momentum=0.8))
+g_gen.add(Conv2D(1, kernel_size=3, padding="same"))
+g_gen.add(Activation("tanh"))
+g_gen.summary()
 
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(256, (3, 3), activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(256, (3, 3), activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(256, (3, 3), activation='relu'))
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, (3, 3), activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, (3, 3), activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, (3, 3), activation='relu'))
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, (3, 3), activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, (3, 3), activation='relu'))
-    model.add(ZeroPadding2D((1, 1)))
-    model.add(Convolution2D(512, (3, 3), activation='relu'))
-    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
-    # Add Fully Connected Layer
-    model.add(Flatten())
-    model.add(Dense(1024, activation='relu'))
-    model.add(Dropout(0.5))
-    model.add(Dense(512, activation='relu'))
-    model.add(Dropout(0.5))
-    model.add(Dense(1000, activation='softmax'))
-
-    # Truncate and replace softmax layer for transfer learning
-    model.layers.pop()
-    model.outputs = [model.layers[-1].output]
-    model.layers[-1].outbound_nodes = []
-    model.add(Dense(num_classes, activation='softmax'))
-    return model
-
-model = vgg16_model(img_rows, img_cols, channel=1, num_classes=num_classes)
-
-def model_generator():
-    model = Sequential()
-    input_shape = 1024
-    nch = 6
-    reg = lambda: l1l2(l1=1e-4, l2=1e-4) #lambda: l1l2(l1=1e-7, l2=1e-7)
-    h = 5
-    model.add(Dense(nch * 4 * 4, input_dim=input_shape, W_regularizer=reg()))
-    model.add(BatchNormalization(mode=0))
-    model.add(Reshape((4, 4, nch)))
-    model.add(Convolution2D(int(nch / 2), (h, h), padding='same', kernel_regularizer=reg()))
-    model.add(BatchNormalization(mode=0, axis=1))
-    model.add(LeakyReLU(0.2))
-    model.add(UpSampling2D(size=(2, 2)))
-    model.add(Convolution2D(int(nch / 2), (h, h), padding='same', kernel_regularizer=reg()))
-    model.add(BatchNormalization(mode=0, axis=1))
-    model.add(LeakyReLU(0.2))
-    model.add(UpSampling2D(size=(2, 2)))
-    model.add(Convolution2D(int(nch / 4), (h, h), padding='same', kernel_regularizer=reg()))
-    model.add(BatchNormalization(mode=0, axis=1))
-    model.add(LeakyReLU(0.2))
-    model.add(UpSampling2D(size=(2, 2)))
-    model.add(Convolution2D(int(nch / 4), (h, h), padding='same', kernel_regularizer=reg()))
-    model.add(BatchNormalization(mode=0, axis=1))
-    model.add(LeakyReLU(0.2))
-    model.add(UpSampling2D(size=(2, 2)))
-    model.add(Convolution2D(int(nch / 4), (h, h), padding='same', kernel_regularizer=reg()))
-    #model.add(Activation('sigmoid'))
-    model.add(Activation('tanh'))
-    return model
-
-g_gen = model_generator()
-
-def model_discriminator():
-    nch = 256
-    h = 5
-    reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-7, l2=1e-7)
-
-    c1 = Convolution2D(int(nch / 4), (h, h), padding='same',
-                       kernel_regularizer=reg(), input_shape=(64, 64, 1))
-    c2 = Convolution2D(int(nch / 2), (h, h), padding='same', kernel_regularizer=reg())
-    c3 = Convolution2D(nch, (h, h), padding='same', kernel_regularizer=reg())
-    c4 = Convolution2D(1, (h, h), padding='same', kernel_regularizer=reg())
-
-    model = Sequential()
-    model.add(c1)
-    model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
-    model.add(LeakyReLU(0.2))
-    model.add(c2)
-    model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
-    model.add(LeakyReLU(0.2))
-    model.add(c3)
-    model.add(MaxPooling2D(pool_size=(4, 4), data_format='channels_last'))
-    # model.add(LeakyReLU(0.2))
-    # model.add(c4)
-    # model.add(MaxPooling2D(pool_size=(4, 4), data_format='channels_last'))#, border_mode='valid')
-    model.add(Flatten())
-    model.add(Dense(1, activation='linear'))
-    return model
-
-g_disc = model_discriminator()
+#
+# g_disc = Sequential()
+# g_disc.add(Conv2D(256, (3,3), activation='relu', input_shape=input_shape, padding='valid'))
+# g_disc.add(Conv2D(256, (3,3), activation='relu', padding='valid'))
+# g_disc.add(MaxPooling2D((2,2)))
+# g_disc.add(Conv2D(256, (3,3), activation='relu', padding='valid'))
+# g_disc.add(MaxPooling2D((2,2)))
+# g_disc.add(Conv2D(512, (3,3), activation='relu', padding='valid'))
+# g_disc.add(MaxPooling2D((2,2)))
+# g_disc.add(Flatten())
+# g_disc.add(Dense(1, activation='linear'))
+# g_disc.trainable=True
+g_disc = Sequential()
+g_disc.add(Conv2D(32, kernel_size=3, strides=2, input_shape=(28,28,1), padding="same"))
+g_disc.add(LeakyReLU(alpha=0.2))
+g_disc.add(Dropout(0.25))
+g_disc.add(Conv2D(64, kernel_size=3, strides=2, padding="same"))
+g_disc.add(ZeroPadding2D(padding=((0,1),(0,1))))
+g_disc.add(LeakyReLU(alpha=0.2))
+g_disc.add(Dropout(0.25))
+g_disc.add(BatchNormalization(momentum=0.8))
+g_disc.add(Conv2D(128, kernel_size=3, strides=2, padding="same"))
+g_disc.add(LeakyReLU(alpha=0.2))
+g_disc.add(Dropout(0.25))
+g_disc.add(BatchNormalization(momentum=0.8))
+g_disc.add(Conv2D(256, kernel_size=3, strides=1, padding="same"))
+g_disc.add(LeakyReLU(alpha=0.2))
+g_disc.add(Dropout(0.25))
+g_disc.add(Flatten())
+g_disc.add(Dense(1, activation='sigmoid'))
+g_disc.summary()
 
 #Create ppgn BEFORE assigning loaded weights
-ppgn = PPGN.NoiselessJointPPGN(model, 19, 34, 37, verbose=3,
+ppgn = PPGN.NoiselessJointPPGN(model, 96, 111, 122, verbose=3,
                                #gan_generator='Default', gan_discriminator='Default')
                                gan_generator=g_gen, gan_discriminator=g_disc)
 
@@ -281,11 +267,11 @@ ppgn.compile(clf_metrics=['accuracy'],
 if not skipFitClf:
     print('Fitting classifier')
     ppgn.fit_classifier(x_train, y_train, validation_data=[x_test, y_test], epochs=20)
-    ppgn.classifier.save_weights('weights/vgg16_feuilles.h5')
+    ppgn.classifier.save_weights('weights/clf_feuilles.h5')
 
 if not skipFitGAN:
     print('Fitting GAN')
-    src, gen = ppgn.fit_gan(x_train, batch_size=32, epochs=2500, report_freq=1, train_procedure=customGANTrain)
+    sfro; rc, gen = ppgn.fit_gan(x_train, batch_size=64, epochs=2500, report_freq=100, train_procedure=customGANTrain)
     ppgn.g_gen.save_weights('weights/g_gen_feuilles.h5')
     ppgn.g_disc.save_weights('weights/g_disc_feuilles.h5')
 
