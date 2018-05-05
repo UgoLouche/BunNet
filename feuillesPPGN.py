@@ -57,9 +57,10 @@ def customGANTrain(x_train, h1_train, batch_size, disc_model, gan_model, epochID
         y_disc = np.concatenate((np.ones((batch_size)), np.zeros((batch_size))))
 
         disc_loss.append(disc_model.train_on_batch(x_disc, y_disc))
-        disc_pred.append(disc_model.predict(x_disc).mean())
+        #disc_pred.append(100 * np.mean(disc_model.predict(x_disc) == y_disc))
+        disc_pred.append(disc_model.predict(x_disc))
 
-    print('GAN/Disc predictions {}'.format(np.mean(disc_pred)))
+    print('GAN/Disc {:.2f} +/- {:.2f}'.format(np.mean(disc_pred), np.std(disc_pred)))
     #train gen
     x_gan = x_train[idX][-1:]
     y_gan = np.ones((1))
@@ -68,6 +69,29 @@ def customGANTrain(x_train, h1_train, batch_size, disc_model, gan_model, epochID
     gan_loss = gan_model.train_on_batch(x_gan, [x_gan, y_gan, h1_gan])
 
     return (np.mean(disc_loss), gan_loss)
+
+def simpleGANTrain(x_train, h1_train, batch_size, disc_model, gan_model, epochID):
+    #train disc
+    idX = np.random.randint(0, x_train.shape[0], batch_size)
+
+    valid = x_train[idX]
+    fake  = gan_model.predict(x_train[idX])[0]
+    x_disc = np.concatenate((valid, fake), axis=0)
+    y_disc = np.concatenate((np.zeros((batch_size)), np.ones((batch_size))))
+
+    disc_loss = disc_model.train_on_batch(x_disc, y_disc)
+    #disc_pred.append(100 * np.mean(disc_model.predict(x_disc) == y_disc))
+    disc_pred = disc_model.predict(x_disc).T[0]
+    print('GAN/Disc {:.2f}'.format(100 * np.mean(np.round(disc_pred) == y_disc)))
+    #train gen
+    x_gan = x_train[idX]
+    y_gan = np.ones((len(idX)))
+    h1_gan = h1_train[idX]
+
+    gan_loss = gan_model.train_on_batch(x_gan, [x_gan, y_gan, h1_gan])
+
+    return (disc_loss, gan_loss)
+
 
 #Test on dataset les Feuilles
 batch_size = 64
@@ -113,6 +137,8 @@ x_test = (x_test - img_mean) / img_scale
 
 # or take the min/max over each channel and normalize
 # Here it just means we divide by 256
+#x_train = ((x_train/255) - 0.5)*2
+#x_test =  ((x_test/255) - 0.5)*2
 #x_train = ((x_train/255) - 0.5)*2
 #x_test =  ((x_test/255) - 0.5)*2
 
@@ -199,8 +225,8 @@ model = vgg16_model(img_rows, img_cols, channel=1, num_classes=num_classes)
 def model_generator():
     model = Sequential()
     input_shape = 1024
-    nch = 6
-    reg = lambda: l1l2(l1=1e-4, l2=1e-4) #lambda: l1l2(l1=1e-7, l2=1e-7)
+    nch = 32
+    reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-4, l2=1e-4)
     h = 5
     model.add(Dense(nch * 4 * 4, input_dim=input_shape, W_regularizer=reg()))
     model.add(BatchNormalization(mode=0))
@@ -209,21 +235,23 @@ def model_generator():
     model.add(BatchNormalization(mode=0, axis=1))
     model.add(LeakyReLU(0.2))
     model.add(UpSampling2D(size=(2, 2)))
-    model.add(Convolution2D(int(nch / 2), (h, h), padding='same', kernel_regularizer=reg()))
-    model.add(BatchNormalization(mode=0, axis=1))
-    model.add(LeakyReLU(0.2))
-    model.add(UpSampling2D(size=(2, 2)))
     model.add(Convolution2D(int(nch / 4), (h, h), padding='same', kernel_regularizer=reg()))
     model.add(BatchNormalization(mode=0, axis=1))
     model.add(LeakyReLU(0.2))
     model.add(UpSampling2D(size=(2, 2)))
-    model.add(Convolution2D(int(nch / 4), (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(Convolution2D(int(nch / 8), (h, h), padding='same', kernel_regularizer=reg()))
     model.add(BatchNormalization(mode=0, axis=1))
     model.add(LeakyReLU(0.2))
     model.add(UpSampling2D(size=(2, 2)))
-    model.add(Convolution2D(int(nch / 4), (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(Convolution2D(int(nch / 16), (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(BatchNormalization(mode=0, axis=1))
+    model.add(LeakyReLU(0.2))
+    model.add(UpSampling2D(size=(2, 2)))
+    model.add(Convolution2D(int(nch / 32), (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(BatchNormalization(mode=0, axis=1))
+    model.add(LeakyReLU(0.2))
     #model.add(Activation('sigmoid'))
-    model.add(Activation('tanh'))
+    #model.add(Activation('tanh'))
     return model
 
 g_gen = model_generator()
@@ -248,17 +276,19 @@ def model_discriminator():
     model.add(LeakyReLU(0.2))
     model.add(c3)
     model.add(MaxPooling2D(pool_size=(4, 4), data_format='channels_last'))
-    # model.add(LeakyReLU(0.2))
-    # model.add(c4)
-    # model.add(MaxPooling2D(pool_size=(4, 4), data_format='channels_last'))#, border_mode='valid')
+    model.add(LeakyReLU(0.2))
+    model.add(c4)
+    model.add(MaxPooling2D(pool_size=(4, 4), data_format='channels_last'))#, border_mode='valid')
+    model.add(LeakyReLU(0.2))
     model.add(Flatten())
-    model.add(Dense(1, activation='linear'))
+    #model.add(Dense(1, activation='linear'))
+    model.add(Dense(1, activation='sigmoid'))
     return model
 
 g_disc = model_discriminator()
 
 #Create ppgn BEFORE assigning loaded weights
-ppgn = PPGN.NoiselessJointPPGN(model, 19, 34, 37, verbose=3,
+ppgn = PPGN.NoiselessJointPPGN(model, 22, 34, 37, verbose=3,
                                #gan_generator='Default', gan_discriminator='Default')
                                gan_generator=g_gen, gan_discriminator=g_disc)
 
@@ -266,12 +296,12 @@ ppgn = PPGN.NoiselessJointPPGN(model, 19, 34, 37, verbose=3,
 skipFitClf=False
 skipFitGAN=False
 if skipFitClf and 'clf_feuilles.h5' in os.listdir('weights/'):
-    model.load_weights('weights/clf_feuilles.h5')
+    model.load_weights('weights/vgg16_feuilles.h5')
     skipFitClf=True
     print('Loaded CLF weights from existing file, will skip training')
 if skipFitGAN and 'g_gen_feuilles.h5' in os.listdir('weights/') and 'g_disc_feuilles.h5' in os.listdir('weights/'):
-    g_gen.load_weights('weights/g_gen_feuilles.h5')
-    g_disc.load_weights('weights/g_disc_feuilles.h5')
+    g_gen.load_weights('weights/g_gen_dcgan_feuilles.h5')
+    g_disc.load_weights('weights/g_disc_dcgan_feuilles.h5')
     skipFitGAN=True
     print('Loaded GAN weights from existing file, will skip training')
 
@@ -285,9 +315,10 @@ if not skipFitClf:
 
 if not skipFitGAN:
     print('Fitting GAN')
-    src, gen = ppgn.fit_gan(x_train, batch_size=32, epochs=2500, report_freq=1, train_procedure=customGANTrain)
-    ppgn.g_gen.save_weights('weights/g_gen_feuilles.h5')
-    ppgn.g_disc.save_weights('weights/g_disc_feuilles.h5')
+    src, gen = ppgn.fit_gan(x_train, batch_size=32, epochs=5000,
+                report_freq=10, train_procedure=simpleGANTrain)
+    ppgn.g_gen.save_weights('weights/g_gen_dcgan_feuilles.h5')
+    ppgn.g_disc.save_weights('weights/g_disc_dcgan_feuilles.h5')
 
     #Plot some GAN metrics computed during fit
     plt.ion()
@@ -300,29 +331,30 @@ if not skipFitGAN:
     plt.legend(['total loss', 'img loss', 'gan loss', 'h loss'])
 
     for i in range(len(src)):
-        #src[i] = np.concatenate((src[i] * img_scale + img_mean), axis=0)
-        #gen[i] = np.concatenate((gen[i] * img_scale + img_mean), axis=0)
-        #img = np.concatenate((src[i], gen[i]), axis=1)
-        src[i] = np.concatenate((src[i]), axis=0)
-        gen[i] = np.concatenate((gen[i]), axis=0)
-        img = (np.concatenate((src[i], gen[i]), axis=1)+1)*255/2
+        src_img = np.concatenate((src[i] * img_scale + img_mean), axis=0)
+        gen_img = np.concatenate((255 * (gen[i] - gen[i].min()) / (gen[i].max() - gen[i].min())), axis=0)
+        img = np.concatenate((src_img, gen_img), axis=1)
+        #src[i] = np.concatenate((src[i]), axis=0)
+        #gen[i] = np.concatenate((gen[i]), axis=0)
+        #img = (np.concatenate((src[i], gen[i]), axis=1)+1)*255/2
         img[img < 0  ] = 0
         img[img > 255] = 255
-        cv2.imwrite('img/feuilles_gan{}.bmp'.format(i), img)
+        cv2.imwrite('img/feuilles64x64_gan{}.bmp'.format(i), np.uint8(img))
 
 h2_base = ppgn.enc2.predict(ppgn.enc1.predict(x_test[0:1]))
 # h2_base=None
 for i in range(num_classes):
     samples, h2 = ppgn.sample(i, nbSamples=100,
                               h2_start=h2_base,
-                              epsilons=(1e2, 1, 1e-15),
-                              lr=1e2, lr_end=1e2, use_lr=True)
+                              epsilons=(1e-6, 1, 1e-15),
+                              lr=1e-2, lr_end=1e-2, use_lr=True)
     h2_base = None#h2[-1]
-    #img = np.concatenate(np.array(samples) * img_scale + img_mean, axis=0)
-    img = (np.concatenate((samples), axis=0)+1)*255/2
+    gen = np.array(samples)
+    img = np.concatenate((255 * (gen - gen.min()) / (gen.max() - gen.min())), axis=0)
+    #img = (np.concatenate((samples), axis=0)+1)*255/2
     print("min/max generated: {}/{}".format(img.min(), img.max()))
     img[img < 0  ] = 0
     img[img > 255] = 255
-    img_grid = img.reshape(input_shape[0]*10, input_shape[1]*10, 1)
+    # img_grid = img.reshape(input_shape[0]*10, input_shape[1]*10, 1)
     fname = 'img/feuilles_{}x{}samples{}.bmp'.format(input_shape[0], input_shape[1], i)
-    cv2.imwrite(fname, cv2.resize(img_grid, (160, 280)))
+    cv2.imwrite(fname, img)
