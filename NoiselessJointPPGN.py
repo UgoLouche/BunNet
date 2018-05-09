@@ -258,7 +258,7 @@ class NoiselessJointPPGN:
 
 
     def fit_gan(self, x_train, batch_size=64,
-                epochs=30000, starting_epoch=0,
+                epochs=30000, starting_epoch=0, save_freq=50,
                 report_freq=500, train_procedure='Default'):
         if train_procedure == 'Default':
             train_procedure = self._defaultGANTrainProcedure
@@ -285,6 +285,11 @@ class NoiselessJointPPGN:
                 idX = np.random.randint(0, x_train.shape[0], 25)
                 source_samples.append(x_train[idX])
                 generated_samples.append(self.g_gen.predict(self.enc2.predict(h1_train[idX])))
+
+            if save_freq > -1 and e % save_freq == 0:
+                self._log('saving epoch #{}'.format(e), 0)
+                self.g_gen.save_weights('weights/g_gen_dcgan_rbg64_feuilles_%04d.h5' %e)
+                self.g_disc.save_weights('weights/g_disc_dcgan_rbg64_feuilles_%04d.h5' %e)
 
         return (source_samples, generated_samples)
 

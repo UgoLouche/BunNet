@@ -1,5 +1,5 @@
 import keras
-import cv2
+import cv2, gc
 import sys, os, h5py
 import numpy as np
 import keras.backend as K
@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 #Test on dataset les Feuilles
 batch_size = 64
 num_classes = 15
-epochs = 15
+n_epochs = 30
 # input image dimensions
 img_rows, img_cols = 64, 64
 data_path = '/home/romain/Projects/cda_bn2018/data/h5py/'
@@ -81,7 +81,7 @@ ppgn = PPGN.NoiselessJointPPGN(model, 25, 34, 37, verbose=3,
 skipFitClf=True
 skipFitGAN=False
 if skipFitClf and 'vgg16_feuilles.h5' in os.listdir('weights/'):
-    model.load_weights('weights/vgg16_feuilles.h5')
+    model.load_weights('weights/vgg16_rgb64_feuilles.h5')
     skipFitClf=True
     print('Loaded CLF weights from existing file, will skip training')
 if skipFitGAN and 'g_gen_feuilles.h5' in os.listdir('weights/') and 'g_disc_feuilles.h5' in os.listdir('weights/'):
@@ -91,29 +91,27 @@ if skipFitGAN and 'g_gen_feuilles.h5' in os.listdir('weights/') and 'g_disc_feui
     print('Loaded GAN weights from existing file, will skip training')
 
 ppgn.compile(clf_metrics=['accuracy'],
-             gan_loss_weight=[1, 2, 1e-1])
+             gan_loss_weight=[10, 1e-1, 1])
 
 if not skipFitClf:
     print('Fitting classifier')
-    ppgn.fit_classifier(x_train, y_train, validation_data=[x_test, y_test], epochs=20)
-    ppgn.classifier.save_weights('weights/vgg16_rgb_feuilles.h5')
+    ppgn.fit_classifier(x_train, y_train, validation_data=[x_test, y_test], epochs=n_epochs)
+    ppgn.classifier.save_weights('weights/vgg16_rgb64_feuilles_30epo.h5')
 
 if not skipFitGAN:
     print('Fitting GAN')
-    src, gen = ppgn.fit_gan(x_train, batch_size=64, epochs=365,
-                report_freq=10, train_procedure=customGANTrain)
-    ppgn.g_gen.save_weights('weights/g_gen_dcgan_feuilles_365.h5')
-    ppgn.g_disc.save_weights('weights/g_disc_dcgan_feuilles_365.h5')
+    src, gen = ppgn.fit_gan(x_train, batch_size=32, epochs=5000,
+                save_freq=100, report_freq=10, train_procedure=customGANTrain)
 
-    #Plot some GAN metrics computed during fit
-    #plt.ion()
-    #plt.figure()
-    #plt.plot(np.array(ppgn.g_disc_loss))
-    #plt.plot(np.array(ppgn.gan_loss)[:, 2])
-    #plt.legend(['disc_loss', 'gen_loss'])
-    #plt.figure()
-    #plt.plot(np.array(ppgn.gan_loss))
-    #plt.legend(['total loss', 'img loss', 'gan loss', 'h loss'])
+    # Plot some GAN metrics computed during fit
+    plt.ion()
+    plt.figure()
+    plt.plot(np.array(ppgn.g_disc_loss))
+    plt.plot(np.array(ppgn.gan_loss)[:, 2])
+    plt.legend(['disc_loss', 'gen_loss'])
+    plt.figure()
+    plt.plot(np.array(ppgn.gan_loss))
+    plt.legend(['total loss', 'img loss', 'gan loss', 'h loss'])
 
     for i in range(len(src)):
         src_img = np.concatenate((src[i] * img_scale + img_mean), axis=0)
@@ -125,7 +123,7 @@ if not skipFitGAN:
         #img = (np.concatenate((src[i], gen[i]), axis=1)+1)*255/2
         img[img < 0  ] = 0
         img[img > 255] = 255
-        cv2.imwrite('img/feuilles64x64_gan{}.bmp'.format(i), np.uint8(img))
+        cv2.imwrite('img/rgb_feuilles64x64_gan{}.bmp'.format(i), np.uint8(img))
 
 h2_base = ppgn.enc2.predict(ppgn.enc1.predict(x_test[0:1]))
 # h2_base=None
