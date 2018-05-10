@@ -7,7 +7,8 @@ from keras.datasets import mnist
 from matplotlib import pylab as plt
 
 import NoiselessJointPPGN as PPGN
-from models import vgg16_model, dcgan_generator, dcgan_discriminator
+from models import vgg16_model, customCNN
+from models import dcgan_generator, dcgan_discriminator
 from training import customGANTrain, deepSimTrain
 
 from sklearn.preprocessing import Normalizer, StandardScaler
@@ -16,7 +17,7 @@ import matplotlib.pyplot as plt
 #Test on dataset les Feuilles
 batch_size = 64
 num_classes = 15
-n_epochs = 30
+n_epochs = 10
 # input image dimensions
 img_rows, img_cols = 64, 64
 data_path = '/home/romain/Projects/cda_bn2018/data/h5py/'
@@ -68,15 +69,16 @@ y_train = keras.utils.to_categorical(y_train, num_classes)
 y_test = keras.utils.to_categorical(y_test, num_classes)
 
 # Classifier
-model = vgg16_model(img_rows, img_cols, channel=3, num_classes=num_classes)
+# model = vgg16_model(img_rows, img_cols, channel=3, num_classes=num_classes)
+model = customCNN(img_rows, img_cols, channel=3, num_classes=num_classes)
 # GAN definition
 g_gen = dcgan_generator()
 g_disc = dcgan_discriminator(channel=3)
 
-#Create ppgn BEFORE assigning loaded weights
-ppgn = PPGN.NoiselessJointPPGN(model, 32, 34, 37, verbose=3,
-                               #gan_generator='Default', gan_discriminator='Default')
-                               gan_generator=g_gen, gan_discriminator=g_disc)
+# Create ppgn BEFORE assigning loaded weights
+# VGG16 indexes = 32, 34, 37
+ppgn = PPGN.NoiselessJointPPGN(model, 18, 20, 23, verbose=3,
+            gan_generator=g_gen, gan_discriminator=g_disc)
 
 #Load weights and skip fit if possible
 skipFitClf=True
@@ -97,11 +99,11 @@ ppgn.compile(clf_metrics=['accuracy'],
 if not skipFitClf:
     print('Fitting classifier')
     ppgn.fit_classifier(x_train, y_train, validation_data=[x_test, y_test], epochs=n_epochs)
-    ppgn.classifier.save_weights('weights/vgg16_rgb64_feuilles_%iepo.h5' %n_epochs)
+    ppgn.classifier.save_weights('weights/cnn7_rgb64_feuilles_%iepo.h5' %n_epochs)
 
 if not skipFitGAN:
     print('Fitting GAN')
-    src, gen = ppgn.fit_gan(x_train, batch_size=64, epochs=2000,
+    src, gen = ppgn.fit_gan(x_train, batch_size=64, epochs=1000,
                 save_freq=100, report_freq=10, train_procedure=deepSimTrain)
                 #save_freq=100, report_freq=10, train_procedure=customGANTrain)
 
@@ -133,8 +135,8 @@ for i in range(num_classes):
     ppgn.sampler_init(i)
     samples, h2 = ppgn.sample(i, nbSamples=100,
                               h2_start=h2_base,
-                              epsilons=(1e2, 1, 1e-15),
-                              lr=1e-1, lr_end=1e-1, use_lr=True)
+                              epsilons=(1e-8, 1, 1e-15),
+                              lr=1e-4, lr_end=1e-4, use_lr=True)
     h2_base = None#h2[-1]
     gen = np.array(samples)
     img = np.concatenate((255 * (gen - gen.min()) / (gen.max() - gen.min())), axis=0)

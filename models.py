@@ -199,3 +199,33 @@ def vgg16_model(img_rows, img_cols, channel=1, num_classes=None):
     model.layers[-1].outbound_nodes = []
     model.add(Dense(num_classes, activation='softmax'))
     return model
+
+def customCNN(img_rows, img_cols, channel=1, num_classes=None, depth=4):
+    model = Sequential()
+    model.add(ZeroPadding2D((1, 1), input_shape=(img_rows, img_cols, channel)))
+    model.add(Convolution2D(64, (3, 3), activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(64, (3, 3), activation='relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(128, (5, 5), activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(128, (5, 5), activation='relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(256, (5, 5), activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(256, (5, 5), activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(256, (5, 5), activation='relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+    model.add(Flatten())
+    model.add(Dense(2048, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(1024, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(num_classes, activation='softmax'))
+    return model

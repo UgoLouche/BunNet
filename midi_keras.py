@@ -7,7 +7,7 @@ import mido
 from matplotlib import pylab as plt
 
 import NoiselessJointPPGN as PPGN
-from models import vgg16_model, dcgan_generator, dcgan_discriminator
+from models import customCNN, dcgan_generator, dcgan_discriminator
 
 #Test on dataset les Feuilles
 batch_size = 64
@@ -16,22 +16,26 @@ epochs = 15
 # input image dimensions
 img_rows, img_cols = 64, 64
 # Classifier
-model = vgg16_model(img_rows, img_cols, channel=3, num_classes=num_classes)
+#model = vgg16_model(img_rows, img_cols, channel=3, num_classes=num_classes)
+model = customCNN(img_rows, img_cols, channel=3, num_classes=num_classes)
 # GAN definition
 g_gen = dcgan_generator()
 g_disc = dcgan_discriminator(channel=3)
 
-#Create ppgn BEFORE assigning loaded weights
-ppgn = PPGN.NoiselessJointPPGN(model, 32, 34, 37, verbose=3,
-                               #gan_generator='Default', gan_discriminator='Default')
-                               gan_generator=g_gen, gan_discriminator=g_disc)
+# Create ppgn BEFORE assigning loaded weights
+# VGG16 indexes = 32, 34, 37
+ppgn = PPGN.NoiselessJointPPGN(model, 18, 20, 23, verbose=3,
+            gan_generator=g_gen, gan_discriminator=g_disc)
 
-ppgn.classifier.load_weights('weights/vgg16_rgb64_feuilles_30epo.h5')
-ppgn.g_gen.load_weights('weights/g_gen_dcgan_rbg64_feuilles_1400.h5')
-ppgn.g_disc.load_weights('weights/g_disc_dcgan_rbg64_feuilles_1400.h5')
+ppgn.classifier.load_weights('weights/cnn7_rgb64_feuilles_10epo.h5')
+ppgn.g_gen.load_weights('weights/g_gen_dcgan_rbg64_deepsim_0900.h5')
+ppgn.g_disc.load_weights('weights/g_disc_dcgan_rbg64_deepsim_0900.h5')
 
 ppgn.compile(clf_metrics=['accuracy'],
              gan_loss_weight=[1, 2, 1e-1])
+
+with open('class_names.txt') as f:
+    class_names = f.readlines()
 
 h2_base = None
 class_range = np.linspace(0, num_classes, 128)
@@ -51,7 +55,7 @@ samples = [np.zeros([img_rows, img_cols, 3])]
 ppgn.sampler_init(neuronId)
 fig = plt.figure()
 ax = fig.add_subplot(111)
-ax.imshow(samples[-1])
+im = ax.imshow(samples[-1])
 try:
     with mido.open_input(portname) as port:
         print('Using {}'.format(port))
@@ -88,8 +92,8 @@ try:
             h2_base = h2[-1]
             if np.isnan(samples[-1]).sum() == 0:
                 sample = (samples[-1] - samples[-1].min()) / (samples[-1].max() - samples[-1].min())
-                plt.imshow(sample)#[:, :, 0])#, vmin=0, vmax=16)
-                plt.title('class id=%i' %neuronId + ' diff norm=%.3e' %h_diff)
-                plt.pause(0.5)
+                im.set_data(sample)#[:, :, 0])#, vmin=0, vmax=16)
+                plt.title(class_names[neuronId].strip() + ' dh=%.3e' %h_diff)
+                plt.pause(0.01)
 except KeyboardInterrupt:
     pass
