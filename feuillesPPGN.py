@@ -8,7 +8,7 @@ from matplotlib import pylab as plt
 
 import NoiselessJointPPGN as PPGN
 from models import vgg16_model, dcgan_generator, dcgan_discriminator
-from training import customGANTrain
+from training import customGANTrain, deepSimTrain
 
 from sklearn.preprocessing import Normalizer, StandardScaler
 import matplotlib.pyplot as plt
@@ -20,6 +20,7 @@ n_epochs = 30
 # input image dimensions
 img_rows, img_cols = 64, 64
 data_path = '/home/romain/Projects/cda_bn2018/data/h5py/'
+# data_path = '/media/romain/data/BainNumeriques/'
 fname = '/rgb_%ix%i.hdf5' %(img_rows, img_cols)
 #Get the data and reshape/convert/normalize
 data = h5py.File(data_path + fname, "r")
@@ -73,7 +74,7 @@ g_gen = dcgan_generator()
 g_disc = dcgan_discriminator(channel=3)
 
 #Create ppgn BEFORE assigning loaded weights
-ppgn = PPGN.NoiselessJointPPGN(model, 25, 34, 37, verbose=3,
+ppgn = PPGN.NoiselessJointPPGN(model, 32, 34, 37, verbose=3,
                                #gan_generator='Default', gan_discriminator='Default')
                                gan_generator=g_gen, gan_discriminator=g_disc)
 
@@ -81,27 +82,28 @@ ppgn = PPGN.NoiselessJointPPGN(model, 25, 34, 37, verbose=3,
 skipFitClf=True
 skipFitGAN=False
 if skipFitClf and 'vgg16_feuilles.h5' in os.listdir('weights/'):
-    model.load_weights('weights/vgg16_rgb64_feuilles.h5')
+    model.load_weights('weights/vgg16_rgb64_feuilles_20epo.h5')
     skipFitClf=True
     print('Loaded CLF weights from existing file, will skip training')
 if skipFitGAN and 'g_gen_feuilles.h5' in os.listdir('weights/') and 'g_disc_feuilles.h5' in os.listdir('weights/'):
-    g_gen.load_weights('weights/g_gen_dcgan_feuilles.h5')
-    g_disc.load_weights('weights/g_disc_dcgan_feuilles.h5')
+    g_gen.load_weights('weights/g_gen_dcgan_rbg64_feuilles_1400.h5')
+    g_disc.load_weights('weights/g_disc_dcgan_rbg64_feuilles_1400.h5')
     skipFitGAN=True
     print('Loaded GAN weights from existing file, will skip training')
 
 ppgn.compile(clf_metrics=['accuracy'],
-             gan_loss_weight=[10, 1e-1, 1])
+             gan_loss_weight=[10, 2, 1e-1]) #[10, 1e-1, 1])
 
 if not skipFitClf:
     print('Fitting classifier')
     ppgn.fit_classifier(x_train, y_train, validation_data=[x_test, y_test], epochs=n_epochs)
-    ppgn.classifier.save_weights('weights/vgg16_rgb64_feuilles_30epo.h5')
+    ppgn.classifier.save_weights('weights/vgg16_rgb64_feuilles_%iepo.h5' %n_epochs)
 
 if not skipFitGAN:
     print('Fitting GAN')
-    src, gen = ppgn.fit_gan(x_train, batch_size=32, epochs=5000,
-                save_freq=100, report_freq=10, train_procedure=customGANTrain)
+    src, gen = ppgn.fit_gan(x_train, batch_size=64, epochs=2000,
+                save_freq=100, report_freq=10, train_procedure=deepSimTrain)
+                #save_freq=100, report_freq=10, train_procedure=customGANTrain)
 
     # Plot some GAN metrics computed during fit
     plt.ion()
@@ -128,10 +130,11 @@ if not skipFitGAN:
 h2_base = ppgn.enc2.predict(ppgn.enc1.predict(x_test[0:1]))
 # h2_base=None
 for i in range(num_classes):
+    ppgn.sampler_init(i)
     samples, h2 = ppgn.sample(i, nbSamples=100,
                               h2_start=h2_base,
                               epsilons=(1e2, 1, 1e-15),
-                              lr=1e-2, lr_end=1e-2, use_lr=True)
+                              lr=1e-1, lr_end=1e-1, use_lr=True)
     h2_base = None#h2[-1]
     gen = np.array(samples)
     img = np.concatenate((255 * (gen - gen.min()) / (gen.max() - gen.min())), axis=0)
@@ -143,3 +146,16 @@ for i in range(num_classes):
     # img_grid = img.reshape(input_shape[0]*10, input_shape[1]*10, 1)
     fname = 'img/feuilles_{}x{}samples{}.bmp'.format(input_shape[0], input_shape[1], i)
     cv2.imwrite(fname, img)
+
+i_class = 0
+n_samples = 1000
+h2_data = np.zeros([n_samples, 2048])
+img_data = np.zeros([n_samples, 64, 64, 3])
+for i in range(n_samples):
+    samples, h2 = ppgn.sample(i_class, nbSamples=1,
+                              h2_start=h2_base,
+                              epsilons=(1e2, 1, 1e-15),
+                              lr=1e-2, lr_end=1e-2, use_lr=True)
+    h2_base = None#h2[-1]
+    h2_data[i] = h2[-1]
+    img_data[i] = samples[-1]

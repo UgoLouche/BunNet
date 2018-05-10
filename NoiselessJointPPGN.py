@@ -198,7 +198,7 @@ class NoiselessJointPPGN:
 #        self.get_gradients = K.function(inputs=input_tensors, outputs=grads)
 #
 #        self._log('Created fwd/bwd function', 2)
-
+        self._sampling_init=False
         self._isCompiled=True
         return
 
@@ -288,11 +288,21 @@ class NoiselessJointPPGN:
 
             if save_freq > -1 and e % save_freq == 0:
                 self._log('saving epoch #{}'.format(e), 0)
-                self.g_gen.save_weights('weights/g_gen_dcgan_rbg64_feuilles_%04d.h5' %e)
-                self.g_disc.save_weights('weights/g_disc_dcgan_rbg64_feuilles_%04d.h5' %e)
+                self.g_gen.save_weights('weights/g_gen_dcgan_rbg64_deepsim_%04d.h5' %e)
+                self.g_disc.save_weights('weights/g_disc_dcgan_rbg64_deepsim_%04d.h5' %e)
 
         return (source_samples, generated_samples)
 
+    def sampler_init(self, neuronID):
+        self._sampling_init = True
+        #Create a TF function for the fwd/bwd pass.
+        #This is a bit of keras/TF dark magic, bear with me
+        #Also see https://github.com/keras-team/keras/issues/2226
+        conditional = K.log(self.sampler.outputs[0][:,neuronID])
+        input_h2 = self.sampler.inputs[0]
+        learning_phase = K.learning_phase()
+        grads = K.gradients(conditional, [input_h2])
+        self.fwd_bwd_pass = K.function([input_h2, learning_phase], grads)
 
     def sample(self, neuronID, epsilons=(1e-11, 1, 1e-17), nbSamples=100, h2_start=None, report_freq=10,
                lr=1e24, lr_end=1e24, use_lr=True):
@@ -308,15 +318,16 @@ class NoiselessJointPPGN:
                       .format(h2_start.shape, self.sampler.input_shape), 0)
             return
 
-
-        #Create a TF function for the fwd/bwd pass.
-        #This is a bit of keras/TF dark magic, bear with me
-        #Also see https://github.com/keras-team/keras/issues/2226
-        conditional = K.log(self.sampler.outputs[0][:,neuronID])
-        input_h2 = self.sampler.inputs[0]
-        learning_phase = K.learning_phase()
-        grads = K.gradients(conditional, [input_h2])
-        fwd_bwd_pass = K.function([input_h2, learning_phase], grads)
+        if not self._sampling_init:
+            self.sampler_init(neuronID)
+        # #Create a TF function for the fwd/bwd pass.
+        # #This is a bit of keras/TF dark magic, bear with me
+        # #Also see https://github.com/keras-team/keras/issues/2226
+        # conditional = K.log(self.sampler.outputs[0][:,neuronID])
+        # input_h2 = self.sampler.inputs[0]
+        # learning_phase = K.learning_phase()
+        # grads = K.gradients(conditional, [input_h2])
+        # fwd_bwd_pass = K.function([input_h2, learning_phase], grads)
 
         h2 = h2_start
         samples = []
@@ -327,9 +338,8 @@ class NoiselessJointPPGN:
             term0 *= epsilons[0]
             self._log("L2-norm of term0={}".format(np.linalg.norm(term0)), 2)
 
-
             #term1 is the gradient after a fwd/bwd pass
-            term1 = fwd_bwd_pass([h2, 0])[0]
+            term1 = self.fwd_bwd_pass([h2, 0])[0]
             term1 *= epsilons[1]
             self._log("L2-norm of term1={}".format(np.linalg.norm(term1)), 2)
 

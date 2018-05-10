@@ -3,7 +3,7 @@ from skimage import io
 from skimage.color import rgb2grey
 from skimage.transform import resize
 
-out_shape = [64, 64]
+out_shape = [128, 128]
 test_size = 600
 
 input_path = '/home/romain/Projects/cda_bn2018/data/BASE_IMAGE/Augmented/'
@@ -17,7 +17,7 @@ for dir_name in os.listdir(input_path):
     n_train_files += len(fnames) - test_size
     n_test_files += test_size
 
-feuilles = h5py.File("rgb_64x64.hdf5", "w")
+feuilles = h5py.File("rgb_%ix%i.hdf5" %(out_shape[0], out_shape[1]), "w")
 train_shape = (n_train_files, out_shape[0], out_shape[1], 3)
 test_shape = (n_test_files, out_shape[0], out_shape[1], 3)
 x_train = feuilles.create_dataset("x_train", train_shape, dtype='i8')

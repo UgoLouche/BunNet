@@ -22,13 +22,13 @@ g_gen = dcgan_generator()
 g_disc = dcgan_discriminator(channel=3)
 
 #Create ppgn BEFORE assigning loaded weights
-ppgn = PPGN.NoiselessJointPPGN(model, 25, 34, 37, verbose=3,
+ppgn = PPGN.NoiselessJointPPGN(model, 32, 34, 37, verbose=3,
                                #gan_generator='Default', gan_discriminator='Default')
                                gan_generator=g_gen, gan_discriminator=g_disc)
 
-ppgn.classifier.load_weights('weights/vgg16_rgb64_feuilles_10epo.h5')
-ppgn.g_gen.load_weights('weights/g_gen_dcgan_rbg64_feuilles_4900.h5')
-ppgn.g_disc.load_weights('weights/g_disc_dcgan_rbg64_feuilles_4900.h5')
+ppgn.classifier.load_weights('weights/vgg16_rgb64_feuilles_30epo.h5')
+ppgn.g_gen.load_weights('weights/g_gen_dcgan_rbg64_feuilles_1400.h5')
+ppgn.g_disc.load_weights('weights/g_disc_dcgan_rbg64_feuilles_1400.h5')
 
 ppgn.compile(clf_metrics=['accuracy'],
              gan_loss_weight=[1, 2, 1e-1])
@@ -48,7 +48,7 @@ else:
     portname = 'Midi Fighter Twister:Midi Fighter Twister MIDI 1 24:0'
 
 samples = [np.zeros([img_rows, img_cols, 3])]
-
+ppgn.sampler_init(neuronId)
 fig = plt.figure()
 ax = fig.add_subplot(111)
 ax.imshow(samples[-1])
@@ -62,8 +62,10 @@ try:
                     epsilons[message.control] = eps_val
                     print('setting ', neuronId, epsilons)
                 elif message.control == 3:
-                    neuronId = int(class_range[message.value])
-                    print('setting ', neuronId, epsilons)
+                    if neuronId != int(class_range[message.value]):
+                        neuronId = int(class_range[message.value])
+                        ppgn.sampler_init(neuronId)
+                        print('setting ', neuronId, epsilons)
                 elif message.control == 4:
                     print(h2_base)
                     h2_base=None
@@ -79,15 +81,15 @@ try:
                                       lr=lr_value, lr_end=lr_value, use_lr=True)
 
             print('time: %f' %(time.time()-tstart))
-            # if h2_base is not None:
-            #     h_diff = np.linalg.norm(h2_base - h2[-1])
-            #     s_diff = np.abs(old_samples[-1]-samples[-1]).sum()
-            #     print(h_diff, s_diff)
-            # h2_base = h2[-1]
-            # if np.isnan(samples[-1]).sum() == 0:
-            #     sample = (samples[-1] - samples[-1].min()) / (samples[-1].max() - samples[-1].min())
-            #     plt.imshow(sample)#[:, :, 0])#, vmin=0, vmax=16)
-            #     plt.title('class id=%i' %neuronId + ' diff norm=%.3e' %h_diff)
-            #     plt.pause(0.5)
+            if h2_base is not None:
+                h_diff = np.linalg.norm(h2_base - h2[-1])
+                s_diff = np.abs(old_samples[-1]-samples[-1]).sum()
+                print(h_diff, s_diff)
+            h2_base = h2[-1]
+            if np.isnan(samples[-1]).sum() == 0:
+                sample = (samples[-1] - samples[-1].min()) / (samples[-1].max() - samples[-1].min())
+                plt.imshow(sample)#[:, :, 0])#, vmin=0, vmax=16)
+                plt.title('class id=%i' %neuronId + ' diff norm=%.3e' %h_diff)
+                plt.pause(0.5)
 except KeyboardInterrupt:
     pass
