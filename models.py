@@ -1,6 +1,6 @@
 from keras.models import Sequential, Model
 from keras.layers import Input, Dense, Dropout, Flatten
-from keras.layers import Conv2D, MaxPooling2D, Reshape
+from keras.layers import Conv2D, MaxPooling2D, Reshape, AveragePooling2D
 from keras.layers import BatchNormalization, Activation, ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D, Convolution2D
@@ -9,7 +9,6 @@ from keras.optimizers import Adam
 from keras.applications import VGG16
 
 from keras_adversarial.legacy import l1l2
-from keras_adversarial.legacy import Dense, BatchNormalization, AveragePooling2D
 from keras_adversarial.image_grid_callback import ImageGridCallback
 from keras_adversarial import AdversarialModel, simple_gan, gan_targets
 from keras_adversarial import AdversarialOptimizerSimultaneous, normal_latent_sampling
@@ -28,16 +27,16 @@ def dcgan_discriminator(channel=1):
 
     model = Sequential()
     model.add(c1)
-    model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
+    model.add(AveragePooling2D(pool_size=(2, 2), data_format='channels_last'))
     model.add(LeakyReLU(0.2))
     model.add(c2)
-    model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
+    model.add(AveragePooling2D(pool_size=(2, 2), data_format='channels_last'))
     model.add(LeakyReLU(0.2))
     model.add(c3)
-    model.add(MaxPooling2D(pool_size=(4, 4), data_format='channels_last'))
+    model.add(AveragePooling2D(pool_size=(4, 4), data_format='channels_last'))
     model.add(LeakyReLU(0.2))
     model.add(c4)
-    model.add(MaxPooling2D(pool_size=(4, 4), data_format='channels_last'))#, border_mode='valid')
+    model.add(AveragePooling2D(pool_size=(4, 4), data_format='channels_last'))#, border_mode='valid')
     model.add(LeakyReLU(0.2))
     model.add(Flatten())
     #model.add(Dense(1, activation='linear'))
@@ -73,7 +72,7 @@ def dcgan_generator():
     model.add(BatchNormalization(mode=0, axis=1))
     model.add(LeakyReLU(0.2))
     #model.add(Activation('sigmoid'))
-    #model.add(Activation('tanh'))
+    model.add(Activation('tanh'))
     return model
 
 def dcgan_gray_generator():
@@ -118,6 +117,35 @@ def dcgan_gray_discriminator():
     c2 = Convolution2D(int(nch / 2), (h, h), padding='same', kernel_regularizer=reg())
     c3 = Convolution2D(nch, (h, h), padding='same', kernel_regularizer=reg())
     c4 = Convolution2D(1, (h, h), padding='same', kernel_regularizer=reg())
+
+    model = Sequential()
+    model.add(c1)
+    model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
+    model.add(LeakyReLU(0.2))
+    model.add(c2)
+    model.add(MaxPooling2D(pool_size=(2, 2), data_format='channels_last'))
+    model.add(LeakyReLU(0.2))
+    model.add(c3)
+    model.add(MaxPooling2D(pool_size=(4, 4), data_format='channels_last'))
+    model.add(LeakyReLU(0.2))
+    model.add(c4)
+    model.add(MaxPooling2D(pool_size=(4, 4), data_format='channels_last'))#, border_mode='valid')
+    model.add(LeakyReLU(0.2))
+    model.add(Flatten())
+    #model.add(Dense(1, activation='linear'))
+    model.add(Dense(1, activation='sigmoid'))
+    return model
+
+def dcgan_discriminator_max_pool(channel=1):
+    nch = 256
+    h = 5
+    reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-7, l2=1e-7)
+
+    c1 = Convolution2D(int(nch / 4), (h, h), padding='same',
+                       kernel_regularizer=reg(), input_shape=(64, 64, channel))
+    c2 = Convolution2D(int(nch / 2), (h, h), padding='same', kernel_regularizer=reg())
+    c3 = Convolution2D(nch, (h, h), padding='same', kernel_regularizer=reg())
+    c4 = Convolution2D(nch, (h, h), padding='same', kernel_regularizer=reg())
 
     model = Sequential()
     model.add(c1)

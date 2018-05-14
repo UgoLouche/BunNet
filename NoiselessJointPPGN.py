@@ -84,7 +84,8 @@ class NoiselessJointPPGN:
                 # Loss for the GAN (discriminator) network
                 g_disc_loss=keras.losses.binary_crossentropy,\
                 # Optimizer  for the GAN (discriminator) network
-                g_disc_opti=keras.optimizers.Adadelta(),\
+                # Adadelta, or SGD recommended by https://github.com/soumith/ganhacks
+                g_disc_opti=keras.optimizers.SGD(),\
                 # Metrics for the GAN (discriminator) network
                 g_disc_metrics=None,\
                 # Losses for the GAN (generator) network
@@ -94,11 +95,13 @@ class NoiselessJointPPGN:
                 # Losses' weights  for the GAN (generator) network
                 gan_loss_weight=[1., 1., 1.],\
                 # Optimizer for the GAN (generator) network
-                gan_opti=keras.optimizers.Adadelta(),\
+                # Adadelta, or ADAM recommended by https://github.com/soumith/ganhacks
+                gan_opti=keras.optimizers.Adam(),\
                 # Loss for the sampler network
                 sampler_loss=keras.losses.categorical_crossentropy,\
                 # Optimizer for the sampler network
-                sampler_opti=keras.optimizers.Adadelta()\
+                # Adadelta, or ADAM recommended by https://github.com/soumith/ganhacks
+                sampler_opti=keras.optimizers.Adam(),\
                 ):
         if not self._classifierSet and self._ganSet:
             self._log('Cannot compile PPGN without setting classifier and GAN first', 0)
@@ -279,7 +282,7 @@ class NoiselessJointPPGN:
                 self._log('fit_gan -- Epoch #{} report'.format(e), 0)
                 self._log('GAN losses -- disc: {:.8e} // gen: {:.8e}'\
                           .format(self.g_disc_loss[-1], self.gan_loss[-1][2]), 0)
-                self._log('Reconstruction losses -- img: {:.2e} // h1: {:.8e}'\
+                self._log('Reconstruction losses -- img: {:.8e} // h1: {:.8e}'\
                           .format(self.gan_loss[-1][1], self.gan_loss[-1][3]), 0)
                 #Generate a bunch of sample to return
                 idX = np.random.randint(0, x_train.shape[0], 25)
@@ -288,8 +291,8 @@ class NoiselessJointPPGN:
 
             if save_freq > -1 and e % save_freq == 0:
                 self._log('saving epoch #{}'.format(e), 0)
-                self.g_gen.save_weights('weights/g_gen_dcgan_rbg64_deepsim_%04d.h5' %e)
-                self.g_disc.save_weights('weights/g_disc_dcgan_rbg64_deepsim_%04d.h5' %e)
+                self.g_gen.save_weights('weights/g_gen_dcgan_rbg64_deepsim_%06d.h5' %e)
+                self.g_disc.save_weights('weights/g_disc_dcgan_rbg64_deepsim_%06d.h5' %e)
 
         return (source_samples, generated_samples)
 

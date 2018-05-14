@@ -27,12 +27,12 @@ g_disc = dcgan_discriminator(channel=3)
 ppgn = PPGN.NoiselessJointPPGN(model, 18, 20, 23, verbose=3,
             gan_generator=g_gen, gan_discriminator=g_disc)
 
-ppgn.classifier.load_weights('weights/cnn7_rgb64_feuilles_10epo.h5')
-ppgn.g_gen.load_weights('weights/g_gen_dcgan_rbg64_deepsim_0900.h5')
-ppgn.g_disc.load_weights('weights/g_disc_dcgan_rbg64_deepsim_0900.h5')
+ppgn.classifier.load_weights('weights/cnn7_rgb64_feuilles_20epo.h5')
+ppgn.g_gen.load_weights('weights/g_gen_dcgan_rbg64_deepsim_8000.h5')
+ppgn.g_disc.load_weights('weights/g_disc_dcgan_rbg64_deepsim_8000.h5')
 
 ppgn.compile(clf_metrics=['accuracy'],
-             gan_loss_weight=[1, 2, 1e-1])
+             gan_loss_weight=[10, 1e-1, 1]) #[1, 2, 1e-1])
 
 with open('class_names.txt') as f:
     class_names = f.readlines()
@@ -91,7 +91,8 @@ try:
                 print(h_diff, s_diff)
             h2_base = h2[-1]
             if np.isnan(samples[-1]).sum() == 0:
-                sample = (samples[-1] - samples[-1].min()) / (samples[-1].max() - samples[-1].min())
+                #sample = (samples[-1] - samples[-1].min()) / (samples[-1].max() - samples[-1].min())
+                sample = np.uint8((samples[-1]+1)*255/2)
                 im.set_data(sample)#[:, :, 0])#, vmin=0, vmax=16)
                 plt.title(class_names[neuronId].strip() + ' dh=%.3e' %h_diff)
                 plt.pause(0.01)

@@ -53,9 +53,9 @@ def deepSimTrain(x_train, h1_train, batch_size, disc_model, gan_model, epochID):
     if discr_loss_ratio > 1e1 and train_gen:
         train_gen = False
         train_discr = True
-        print("<<< real_loss=%e, fake_loss=%e, fake_loss_for_generator=%e, train_discr=%d, train_gen=%d >>>" % (discr_real_loss, discr_fake_loss, discr_fake_for_generator_loss, train_discr, train_gen))
+        print(" <<< real_loss=%e, fake_loss=%e, fake_loss_for_generator=%e, train_discr=%d, train_gen=%d >>>" % (discr_real_loss, discr_fake_loss, discr_fake_for_generator_loss, train_discr, train_gen))
 
-    return ((discr_real_loss + discr_fake_loss)/2, gan_loss)
+    return (discr_fake_loss, gan_loss)
 
 
 ## Definbe custom GAN training procedure based on http://www.nada.kth.se/~ann/exjobb/hesam_pakdaman.pdf
