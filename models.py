@@ -14,13 +14,13 @@ from keras_adversarial import AdversarialModel, simple_gan, gan_targets
 from keras_adversarial import AdversarialOptimizerSimultaneous, normal_latent_sampling
 from image_utils import dim_ordering_shape
 
-def dcgan_discriminator(channel=1):
+def dcgan_discriminator(channel=1, input_shape=(64, 64, 3)):
     nch = 256
     h = 5
     reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-7, l2=1e-7)
 
     c1 = Convolution2D(int(nch / 4), (h, h), padding='same',
-                       kernel_regularizer=reg(), input_shape=(64, 64, channel))
+                       kernel_regularizer=reg(), input_shape=input_shape)
     c2 = Convolution2D(int(nch / 2), (h, h), padding='same', kernel_regularizer=reg())
     c3 = Convolution2D(nch, (h, h), padding='same', kernel_regularizer=reg())
     c4 = Convolution2D(nch, (h, h), padding='same', kernel_regularizer=reg())
@@ -74,6 +74,105 @@ def dcgan_generator():
     #model.add(Activation('sigmoid'))
     model.add(Activation('tanh'))
     return model
+
+def dcgan_128generator():
+    model = Sequential()
+    input_shape = 2048
+    nch = 64
+    reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-4, l2=1e-4)
+    h = 5
+    model.add(Dense(nch * 4 * 4, input_dim=input_shape, W_regularizer=reg()))
+    model.add(BatchNormalization(mode=0))
+    model.add(Reshape((4, 4, nch)))
+    model.add(Convolution2D(int(nch / 2), (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(BatchNormalization(mode=0, axis=1))
+    model.add(LeakyReLU(0.2))
+    model.add(UpSampling2D(size=(2, 2)))
+    model.add(Convolution2D(int(nch / 4), (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(BatchNormalization(mode=0, axis=1))
+    model.add(LeakyReLU(0.2))
+    model.add(UpSampling2D(size=(2, 2)))
+    model.add(Convolution2D(int(nch / 2), (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(BatchNormalization(mode=0, axis=1))
+    model.add(LeakyReLU(0.2))
+    model.add(UpSampling2D(size=(2, 2)))
+    model.add(Convolution2D(int(nch / 4), (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(BatchNormalization(mode=0, axis=1))
+    model.add(LeakyReLU(0.2))
+    model.add(UpSampling2D(size=(2, 2)))
+    model.add(Convolution2D(int(nch / 8), (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(BatchNormalization(mode=0, axis=1))
+    model.add(LeakyReLU(0.2))
+    model.add(UpSampling2D(size=(2, 2)))
+    model.add(Convolution2D(3, (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(BatchNormalization(mode=0, axis=1))
+    model.add(LeakyReLU(0.2))
+    model.add(Activation('sigmoid'))
+    #model.add(Activation('tanh'))
+    return model
+
+def dcgan_256generator():
+    model = Sequential()
+    input_shape = 2048
+    nch = 64
+    reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-4, l2=1e-4)
+    h = 5
+    model.add(Dense(nch * 4 * 4, input_dim=input_shape, W_regularizer=reg()))
+    model.add(BatchNormalization(mode=0))
+    model.add(Reshape((4, 4, nch)))
+    model.add(Convolution2D(int(nch / 2), (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(BatchNormalization(mode=0, axis=1))
+    model.add(LeakyReLU(0.2))
+    # 4x4 UpSampling instead of 2x2 to shallow the network and reduce the RAM
+    model.add(UpSampling2D(size=(4, 4)))
+    model.add(Convolution2D(int(nch / 4), (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(BatchNormalization(mode=0, axis=1))
+    model.add(LeakyReLU(0.2))
+    model.add(UpSampling2D(size=(4, 4)))
+    model.add(Convolution2D(int(nch / 4), (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(BatchNormalization(mode=0, axis=1))
+    model.add(LeakyReLU(0.2))
+    model.add(UpSampling2D(size=(2, 2)))
+    model.add(Convolution2D(int(nch / 8), (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(BatchNormalization(mode=0, axis=1))
+    model.add(LeakyReLU(0.2))
+    model.add(UpSampling2D(size=(2, 2)))
+    model.add(Convolution2D(3, (h, h), padding='same', kernel_regularizer=reg()))
+    model.add(BatchNormalization(mode=0, axis=1))
+    model.add(LeakyReLU(0.2))
+    model.add(Activation('sigmoid'))
+    #model.add(Activation('tanh'))
+    return model
+
+def dcgan_disc_light(channel=1, input_shape=(64, 64, 3)):
+    nch = 256
+    h = 5
+    reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-7, l2=1e-7)
+
+    c1 = Convolution2D(int(nch / 32), (h, h), padding='same',
+                       kernel_regularizer=reg(), input_shape=input_shape)
+    c2 = Convolution2D(int(nch / 16), (h, h), padding='same', kernel_regularizer=reg())
+    c3 = Convolution2D(int(nch / 8), (h, h), padding='same', kernel_regularizer=reg())
+    c4 = Convolution2D(int(nch / 4), (h, h), padding='same', kernel_regularizer=reg())
+
+    model = Sequential()
+    model.add(c1)
+    model.add(AveragePooling2D(pool_size=(2, 2), data_format='channels_last'))
+    model.add(LeakyReLU(0.2))
+    model.add(c2)
+    model.add(AveragePooling2D(pool_size=(2, 2), data_format='channels_last'))
+    model.add(LeakyReLU(0.2))
+    model.add(c3)
+    model.add(AveragePooling2D(pool_size=(4, 4), data_format='channels_last'))
+    model.add(LeakyReLU(0.2))
+    model.add(c4)
+    model.add(AveragePooling2D(pool_size=(4, 4), data_format='channels_last'))#, border_mode='valid')
+    model.add(LeakyReLU(0.2))
+    model.add(Flatten())
+    #model.add(Dense(1, activation='linear'))
+    model.add(Dense(1, activation='sigmoid'))
+    return model
+
 
 def dcgan_gray_generator():
     model = Sequential()
@@ -248,6 +347,67 @@ def customCNN(img_rows, img_cols, channel=1, num_classes=None, depth=4):
     model.add(Convolution2D(256, (5, 5), activation='relu'))
     model.add(ZeroPadding2D((1, 1)))
     model.add(Convolution2D(256, (5, 5), activation='relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+    model.add(Flatten())
+    model.add(Dense(2048, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(1024, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(num_classes, activation='softmax'))
+    return model
+
+
+def customCNN_light(img_rows, img_cols, channel=1, num_classes=None, depth=4):
+    model = Sequential()
+    model.add(ZeroPadding2D((1, 1), input_shape=(img_rows, img_cols, channel)))
+    model.add(Convolution2D(32, (3, 3), activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(32, (3, 3), activation='relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(64, (5, 5), activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(64, (5, 5), activation='relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(128, (5, 5), activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(128, (5, 5), activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(128, (5, 5), activation='relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+    model.add(Flatten())
+    model.add(Dense(2048, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(1024, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(num_classes, activation='softmax'))
+    return model
+
+def customCNN_ultralight(img_rows, img_cols, channel=1, num_classes=None, depth=4):
+    model = Sequential()
+    model.add(ZeroPadding2D((1, 1), input_shape=(img_rows, img_cols, channel)))
+    model.add(Convolution2D(16, (3, 3), activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(16, (3, 3), activation='relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(32, (5, 5), activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(32, (5, 5), activation='relu'))
+    model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(64, (5, 5), activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(64, (5, 5), activation='relu'))
+    model.add(ZeroPadding2D((1, 1)))
+    model.add(Convolution2D(64, (5, 5), activation='relu'))
     model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
     model.add(Flatten())

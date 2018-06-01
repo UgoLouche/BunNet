@@ -16,24 +16,25 @@ def deepSimTrain(x_train, h1_train, batch_size, disc_model, gan_model, epochID):
     # pool a batch of sampless
     idX = np.random.randint(0, x_train.shape[0], batch_size)
     x_gan = x_train[idX]
-    y_gan = np.ones((len(idX)))
+    y_gan = np.ones([batch_size]) + np.random.normal(0, .01, len(idX))
     h1_gan = h1_train[idX]
-
+    y_real = np.zeros([batch_size]) + np.abs(np.random.normal(0, .01, batch_size))
+    y_fake = np.ones([batch_size]) + np.random.normal(0, .01, batch_size)
     # run the discriminator on real data
     if train_discr:
-        discr_real_loss = disc_model.train_on_batch(x_train[idX], np.zeros([batch_size]))
+        discr_real_loss = disc_model.train_on_batch(x_train[idX], y_real)
     else:
-        discr_real_loss = disc_model.test_on_batch(x_train[idX], np.zeros([batch_size]))
+        discr_real_loss = disc_model.test_on_batch(x_train[idX], y_real)
 
     # run the discriminator on generated data
-    fake  = gan_model.predict(x_train[idX])[0]
+    x_fake  = gan_model.predict(x_train[idX])[0]
     if train_discr:
-        discr_fake_loss  = disc_model.train_on_batch(fake, np.ones([batch_size]))
+        discr_fake_loss  = disc_model.train_on_batch(x_fake, y_fake)
     else:
-        discr_fake_loss  = disc_model.test_on_batch(fake, np.ones([batch_size]))
+        discr_fake_loss  = disc_model.test_on_batch(x_fake, y_fake)
 
     # run the discriminator on generated data with opposite labels, to get the gradient for the generator
-    discr_fake_for_generator_loss = disc_model.test_on_batch(fake, np.zeros([batch_size]))
+    discr_fake_for_generator_loss = disc_model.test_on_batch(x_fake, y_real)
     discr_loss_ratio = (discr_real_loss + discr_fake_loss) / discr_fake_for_generator_loss
 
     # finally, run the generator on batch data

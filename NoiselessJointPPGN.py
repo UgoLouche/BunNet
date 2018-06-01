@@ -259,6 +259,47 @@ class NoiselessJointPPGN:
                             validation_data=validation_data)
         return
 
+    def augment_and_fit_classifier(self, x_train, y_train, batch_size=64, epochs=10, verbose=1, validation_data=None):
+        from keras.preprocessing.image import ImageDataGenerator
+        train_gen = ImageDataGenerator(channel_shift_range=0.0, rotation_range=90,
+                                       width_shift_range=.2, height_shift_range=.2,
+                                       horizontal_flip=True, vertical_flip=True,
+                                       shear_range=0.2, zoom_range=0.2)
+        train_gen.fit(x_train)
+        x_valid, y_valid = validation_data[0], validation_data[1]
+        valid_gen = ImageDataGenerator(channel_shift_range=0.0, rotation_range=90,
+                                       width_shift_range=.2, height_shift_range=.2,
+                                       horizontal_flip=True, vertical_flip=True,
+                                       shear_range=0.2, zoom_range=0.2)
+        valid_gen.fit(x_valid)
+        self.classifier.fit_generator(train_gen.flow(x_train, y_train, batch_size=batch_size),
+                            epochs=epochs,
+                            verbose=verbose,
+                            validation_data=valid_gen.flow(x_valid, y_valid, batch_size=batch_size))
+        return
+
+    def fit_classifier_from_directory(self, train_gen, train_path, valid_gen, valid_path,
+                                      batch_size=64, epochs=10, verbose=1, target_size=(256, 256)):
+        from keras.preprocessing.image import ImageDataGenerator
+        train_flow = train_gen.flow_from_directory(train_path, target_size=target_size,
+                                    color_mode='rgb', classes=None,
+                                    class_mode='categorical', batch_size=batch_size,
+                                    shuffle=True, seed=None, save_to_dir=None,
+                                    save_prefix='train_aug', save_format='png',
+                                    follow_links=False, subset=None, interpolation='nearest')
+
+        valid_flow = valid_gen.flow_from_directory(valid_path, target_size=target_size,
+                                    color_mode='rgb', classes=None,
+                                    class_mode='categorical', batch_size=batch_size,
+                                    shuffle=True, seed=None, save_to_dir=None,
+                                    save_prefix='valid_aug', save_format='png',
+                                    follow_links=False, subset=None, interpolation='nearest')
+
+        self.classifier.fit_generator(train_flow,
+                            epochs=epochs,
+                            verbose=verbose,
+                            validation_data=valid_flow)
+        return
 
     def fit_gan(self, x_train, batch_size=64,
                 epochs=30000, starting_epoch=0, save_freq=50,
@@ -293,6 +334,108 @@ class NoiselessJointPPGN:
                 self._log('saving epoch #{}'.format(e), 0)
                 self.g_gen.save_weights('weights/g_gen_dcgan_rbg64_deepsim_%06d.h5' %e)
                 self.g_disc.save_weights('weights/g_disc_dcgan_rbg64_deepsim_%06d.h5' %e)
+
+        return (source_samples, generated_samples)
+
+    def augment_and_fit_gan(self, x_train, batch_size=64,
+                epochs=30000, starting_epoch=0, save_freq=50,
+                report_freq=500, train_procedure='Default',
+                save_img_dir=None):
+        if train_procedure == 'Default':
+            train_procedure = self._defaultGANTrainProcedure
+
+        from keras.preprocessing.image import ImageDataGenerator
+        datagen = ImageDataGenerator(channel_shift_range=0.0, rotation_range=90,
+                                     width_shift_range=.2, height_shift_range=.2,
+                                     horizontal_flip=True, vertical_flip=True,
+                                     shear_range=0.2, zoom_range=0.2)
+        datagen.fit(x_train)
+        # epoch counter
+        e = starting_epoch
+        self.g_disc_loss = []
+        self.gan_loss = []
+        source_samples = []
+        generated_samples = []
+        for x_batch, y_batch in datagen.flow(x_train, np.zeros([x_train.shape[0]]),
+                                    batch_size=batch_size, save_to_dir=save_img_dir, save_prefix='aug', save_format='jpg'):
+            #TODO add flag checks
+            h1_batch = self.enc1.predict(x_batch)
+            (dl, gl) = train_procedure(x_batch, h1_batch, batch_size, self.g_disc, self.gan, e)
+            self.g_disc_loss.append(dl)
+            self.gan_loss.append(gl)
+
+            #Produce a report
+            if report_freq!=-1 and e%report_freq==0:
+                self._log('fit_gan -- Epoch #{} report'.format(e), 0)
+                self._log('GAN losses -- disc: {:.8e} // gen: {:.8e}'\
+                          .format(self.g_disc_loss[-1], self.gan_loss[-1][2]), 0)
+                self._log('Reconstruction losses -- img: {:.8e} // h1: {:.8e}'\
+                          .format(self.gan_loss[-1][1], self.gan_loss[-1][3]), 0)
+                #Generate a bunch of sample to return
+                source_samples.append(x_batch)
+                generated_samples.append(self.g_gen.predict(self.enc2.predict(h1_batch)))
+
+            if save_freq > -1 and e % save_freq == 0:
+                self._log('saving epoch #{}'.format(e), 0)
+                self.g_gen.save_weights('weights/g_gen_dcgan_rbg64_deepsim_noisy_%06d.h5' %e)
+                self.g_disc.save_weights('weights/g_disc_dcgan_rbg64_deepsim_noisy_%06d.h5' %e)
+
+            if e > epochs:
+                break
+
+            # increment epoch counter
+            e += 1
+
+        return (source_samples, generated_samples)
+
+    def fit_gan_from_directory(self, train_gen, data_path, target_size=(256, 256),
+                epochs=30000, starting_epoch=0, save_freq=50, fname='dcgan_rbg256_deepsim_noisy',
+                report_freq=500, train_procedure='Default',
+                save_img_dir=None, batch_size=64):
+        if train_procedure == 'Default':
+            train_procedure = self._defaultGANTrainProcedure
+
+        # epoch counter
+        e = starting_epoch
+        self.g_disc_loss = []
+        self.gan_loss = []
+        source_samples = []
+        generated_samples = []
+        train_flow = train_gen.flow_from_directory(data_path, target_size=target_size,
+                                    color_mode='rgb', classes=None,
+                                    class_mode='categorical', batch_size=batch_size,
+                                    shuffle=True, seed=None, save_to_dir=save_img_dir,
+                                    save_prefix='aug', save_format='png',
+                                    follow_links=False, subset=None, interpolation='nearest')
+
+        for x_batch, y_batch in train_flow:
+            #TODO add flag checks
+            h1_batch = self.enc1.predict(x_batch)
+            (dl, gl) = train_procedure(x_batch, h1_batch, batch_size, self.g_disc, self.gan, e)
+            self.g_disc_loss.append(dl)
+            self.gan_loss.append(gl)
+
+            #Produce a report
+            if report_freq!=-1 and e%report_freq==0:
+                self._log('fit_gan -- Epoch #{} report'.format(e), 0)
+                self._log('GAN losses -- disc: {:.8e} // gen: {:.8e}'\
+                          .format(self.g_disc_loss[-1], self.gan_loss[-1][2]), 0)
+                self._log('Reconstruction losses -- img: {:.8e} // h1: {:.8e}'\
+                          .format(self.gan_loss[-1][1], self.gan_loss[-1][3]), 0)
+                #Generate a bunch of sample to return
+                # source_samples.append(x_batch)
+                # generated_samples.append(self.g_gen.predict(self.enc2.predict(h1_batch)))
+
+            if save_freq > -1 and e % save_freq == 0:
+                self._log('saving epoch #{}'.format(e), 0)
+                self.g_gen.save_weights('weights/g_gen_' + fname + '_%06d.h5' %e)
+                self.g_disc.save_weights('weights/g_disc_' + fname + '_%06d.h5' %e)
+
+            if e > epochs:
+                break
+
+            # increment epoch counter
+            e += 1
 
         return (source_samples, generated_samples)
 
@@ -331,9 +474,10 @@ class NoiselessJointPPGN:
         # learning_phase = K.learning_phase()
         # grads = K.gradients(conditional, [input_h2])
         # fwd_bwd_pass = K.function([input_h2, learning_phase], grads)
-
+        img_rows, img_cols, img_chan = self.g_gen.output_shape[1:]
         h2 = h2_start
-        samples = []
+        samples = np.zeros([nbSamples, img_rows, img_cols, img_chan])
+        h2_list = np.zeros([nbSamples, h2[0].shape[0]])
         for s in range(nbSamples):
             step_size = lr + ((lr_end - lr) * s) / nbSamples
             #term0 is the reconstruction error of  h2
@@ -353,16 +497,18 @@ class NoiselessJointPPGN:
             #h2 = h2_old + term0 + term1 + term2
             d_h = term0 + term1 + term2
             d_h_coeff = step_size/np.abs(d_h).mean() if use_lr else 1
+            self._log("L2-norm of d_h={}".format(np.linalg.norm(d_h_coeff * d_h)), 2)
             h2 += d_h_coeff * d_h
 
             if report_freq != -1 and s % report_freq == 0:
                 self._log('Sample #{}. h diff: {:.2e}, img diff: {:.2e}'\
-                          .format(s, np.abs(h2 - h2_old).sum(),\
-                                  np.abs(self.g_gen.predict(h2) - self.g_gen.predict(h2_old)).sum()), 2)
+                          .format(s, np.linalg.norm(h2 - h2_old),\
+                                  np.linalg.norm(self.g_gen.predict(h2) - self.g_gen.predict(h2_old))), 2)
 
-            samples.append(self.g_gen.predict(h2)[0])
+            samples[s] = self.g_gen.predict(h2)[0]
+            h2_list[s] = h2[0]
 
-        return (samples, h2)
+        return (samples, h2_list)
 
 
     #Alternate training between disc/gen

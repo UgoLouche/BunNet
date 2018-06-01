@@ -1,15 +1,15 @@
-Citron
-Mirabelle (Recto)
-Mirabelle (Verso)
-Kiwi
-Olivier (Recto)
-Olivier (Verso)
-Orange
-Tieule (Recto)
-Tieule (Verso)
-Chene vert (Recto)
-Chene vert (Verso)
-Laurier (Recto)
-Laurier (Verso)
-Arbre (Recto)
-Arbre (Verso)
+Mirabelle Recto
+Mirabelle Verso
+Olivier Recto
+Olivier Verso
+Tieule Recto
+Tieule Verso
+Chene vert Recto
+Chene vert Verso
+Laurier Recto
+Laurier Verso
+Arbre Recto
+Arbre Verso
+Chene Blanc Recto
+Chene Blanc Verso
+Enghien Recto
