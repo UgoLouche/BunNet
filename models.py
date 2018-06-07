@@ -7,8 +7,8 @@ from keras.layers.convolutional import UpSampling2D, Conv2D, Convolution2D
 
 from keras.optimizers import Adam
 from keras.applications import VGG16
+from keras.regularizers import L1L2
 
-from keras_adversarial.legacy import l1l2
 from keras_adversarial.image_grid_callback import ImageGridCallback
 from keras_adversarial import AdversarialModel, simple_gan, gan_targets
 from keras_adversarial import AdversarialOptimizerSimultaneous, normal_latent_sampling
@@ -17,7 +17,7 @@ from image_utils import dim_ordering_shape
 def dcgan_discriminator(channel=1, input_shape=(64, 64, 3)):
     nch = 256
     h = 5
-    reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-7, l2=1e-7)
+    reg = lambda: L1L2(l1=1e-7, l2=1e-7)#L1L2(l1=1e-7, l2=1e-7)
 
     c1 = Convolution2D(int(nch / 4), (h, h), padding='same',
                        kernel_regularizer=reg(), input_shape=input_shape)
@@ -47,7 +47,7 @@ def dcgan_generator():
     model = Sequential()
     input_shape = 2048
     nch = 64
-    reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-4, l2=1e-4)
+    reg = lambda: L1L2(l1=1e-7, l2=1e-7)#L1L2(l1=1e-4, l2=1e-4)
     h = 5
     model.add(Dense(nch * 4 * 4, input_dim=input_shape, W_regularizer=reg()))
     model.add(BatchNormalization(mode=0))
@@ -79,7 +79,7 @@ def dcgan_128generator():
     model = Sequential()
     input_shape = 2048
     nch = 64
-    reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-4, l2=1e-4)
+    reg = lambda: L1L2(l1=1e-7, l2=1e-7)#L1L2(l1=1e-4, l2=1e-4)
     h = 5
     model.add(Dense(nch * 4 * 4, input_dim=input_shape, W_regularizer=reg()))
     model.add(BatchNormalization(mode=0))
@@ -115,7 +115,7 @@ def dcgan_256generator():
     model = Sequential()
     input_shape = 2048
     nch = 64
-    reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-4, l2=1e-4)
+    reg = lambda: L1L2(l1=1e-7, l2=1e-7)#L1L2(l1=1e-4, l2=1e-4)
     h = 5
     model.add(Dense(nch * 4 * 4, input_dim=input_shape, W_regularizer=reg()))
     model.add(BatchNormalization(mode=0))
@@ -147,7 +147,7 @@ def dcgan_256generator():
 def dcgan_disc_light(channel=1, input_shape=(64, 64, 3)):
     nch = 256
     h = 5
-    reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-7, l2=1e-7)
+    reg = lambda: L1L2(l1=1e-7, l2=1e-7)#L1L2(l1=1e-7, l2=1e-7)
 
     c1 = Convolution2D(int(nch / 32), (h, h), padding='same',
                        kernel_regularizer=reg(), input_shape=input_shape)
@@ -178,7 +178,7 @@ def dcgan_gray_generator():
     model = Sequential()
     input_shape = 1024
     nch = 32
-    reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-4, l2=1e-4)
+    reg = lambda: L1L2(l1=1e-7, l2=1e-7)#L1L2(l1=1e-4, l2=1e-4)
     h = 5
     model.add(Dense(nch * 4 * 4, input_dim=input_shape, W_regularizer=reg()))
     model.add(BatchNormalization(mode=0))
@@ -209,7 +209,7 @@ def dcgan_gray_generator():
 def dcgan_gray_discriminator():
     nch = 256
     h = 5
-    reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-7, l2=1e-7)
+    reg = lambda: L1L2(l1=1e-7, l2=1e-7)#L1L2(l1=1e-7, l2=1e-7)
 
     c1 = Convolution2D(int(nch / 4), (h, h), padding='same',
                        kernel_regularizer=reg(), input_shape=(64, 64, 1))
@@ -238,7 +238,7 @@ def dcgan_gray_discriminator():
 def dcgan_discriminator_max_pool(channel=1):
     nch = 256
     h = 5
-    reg = lambda: l1l2(l1=1e-7, l2=1e-7)#l1l2(l1=1e-7, l2=1e-7)
+    reg = lambda: L1L2(l1=1e-7, l2=1e-7)#L1L2(l1=1e-7, l2=1e-7)
 
     c1 = Convolution2D(int(nch / 4), (h, h), padding='same',
                        kernel_regularizer=reg(), input_shape=(64, 64, channel))

@@ -16,11 +16,12 @@ plt.ion()
 
 #Test on dataset les Feuilles
 batch_size = 64
-num_classes = 15
+num_classes = 16
 n_epochs = 20
 # input image dimensions
 img_rows, img_cols = 256, 256
 data_path = '/home/romain/Projects/cda_bn2018/data/BASE_IMAGE/Database/'
+# data_path = 'C:\\Users\\Romain\\Projects\\cda_bn2018\\data\\BASE_IMAGE\\Database\\'
 dir_names = os.listdir(data_path)
 dir_names.sort()
 # Classifier
@@ -28,13 +29,11 @@ dir_names.sort()
 # model = customCNN(img_rows, img_cols, channel=3, num_classes=num_classes)
 model = customCNN_ultralight(img_rows, img_cols, channel=3, num_classes=num_classes)
 #Load weights
-model.load_weights('weights/cnn7_ultralight_rgb256_aug_10epo.h5')
+model.load_weights('weights/cnn7_ultralight_rgb256_aug_rot0_zoom20_10epo.h5')
 # with a Sequential model
 layer_name = model.get_layer(index=19).name
 h2_layer_model = Model(inputs=model.input,
                        outputs=model.get_layer(layer_name).output)
-
-h2_output = h2_layer_model.predict(data)
 
 sc = StandardScaler()
 tsne = TSNE(n_components=2, random_state=42)
@@ -43,9 +42,11 @@ with open('class_names.txt') as f:
     class_names = f.readlines()
 
 # go back to 64x64 for vizualisation
+n_img = 7227
 img_rows, img_cols = 256, 256#
-samples, h2_values = [], []
-
+samples = np.zeros([n_img, img_rows, img_cols, 3])
+h2_values = np.zeros([n_img, 2048])
+counter = 0
 for class_dir in dir_names:
     print('Processing ' + class_dir)
     fnames = os.listdir(data_path + class_dir)
@@ -53,38 +54,90 @@ for class_dir in dir_names:
         im = Image.open(data_path + class_dir + '/' + fname)
         img = np.array(im.resize((img_rows, img_cols)))/255.
         h2_value = h2_layer_model.predict(np.array([img]))[0]
-        h2_values.append(h2_value)
-        samples.append(img)
+        h2_values[counter] = h2_value
+        samples[counter] = img
+        counter += 1
 
-print('fitting a TSNE representation of h2...')
-duplicat_count = 0
-img_rows, img_cols = 64, 64 #256, 256
-try:
-    h2_trans = tsne.fit_transform(h2_values)
-    hmin, hmax = h2_trans.min(), h2_trans.max()
-    width = np.ceil(hmax-hmin).astype(int)
-    wall = np.zeros([img_rows*width, img_cols*width, 3], dtype=np.uint8)
-    for s in range(len(samples)):
-        xy = np.int_(h2_trans[s]-hmin)
-        x, y = xy[0]*img_rows, xy[1]*img_cols
-        if wall[x:x+img_rows, y:y+img_cols].sum() > 0:
-            duplicat_count += 1
-        else:
-            wall[x:x+img_rows, y:y+img_cols] = cv2.resize(samples[s], (img_rows, img_cols)) * 255
+# print('fitting a TSNE representation of h2...')
+# duplicat_count = 0
+# img_rows, img_cols = 64, 64 #256, 256
+# try:
+#     h2_trans = tsne.fit_transform(h2_values)
+#     hmin, hmax = h2_trans.min(), h2_trans.max()
+#     width = np.ceil(hmax-hmin).astype(int)
+#     wall = np.zeros([img_rows*width, img_cols*width, 3], dtype=np.uint8)
+#     for s in range(len(samples)):
+#         xy = np.int_(h2_trans[s]-hmin)
+#         x, y = xy[0]*img_rows, xy[1]*img_cols
+#         if wall[x:x+img_rows, y:y+img_cols].sum() > 0:
+#             duplicat_count += 1
+#         else:
+#             wall[x:x+img_rows, y:y+img_cols] = cv2.resize(samples[s], (img_rows, img_cols)) * 255
+#
+#     wall[wall < 0  ] = 0
+#     wall[wall > 255] = 255
+#     print('found %i masked images' %duplicat_count)
+#     # img_grid = img.reshape(input_shape[0]*10, input_shape[1]*10, 1)
+#     fname = 'img/tsne_wall_orig_feuilles_final.png'
+#     im = Image.fromarray(wall)
+#     print('saving map in ' + fname)
+#     im.save(fname, optimize=True)
+# except MemoryError:
+#     print('Memory Error, skipping TSNE')
+#
+# map_count += 1
+# gc.collect()
+#
+# img_rows, img_cols = 256, 256
+# h2_trans = tsne.fit_transform(h2_values)
 
-    wall[wall < 0  ] = 0
-    wall[wall > 255] = 255
-    print('found %i masked images' %duplicat_count)
-    # img_grid = img.reshape(input_shape[0]*10, input_shape[1]*10, 1)
-    fname = 'img/tsne_wall_orig_feuilles.png'
-    im = Image.fromarray(wall)
-    print('saving map in ' + fname)
-    im.save(fname, optimize=True)
-except MemoryError:
-    print('Memory Error, skipping TSNE')
-
-map_count += 1
+del h2_values, model
 gc.collect()
+
+h2_trans = np.load('h2_tsne.npy')
+img_rows, img_cols = 256, 256 #64, 64
+#sel = (h2_trans[:, 0] < 0) & (h2_trans[:, 1] < 0)
+#h2_trans = h2_trans[sel]
+#samples = samples[sel]
+
+map_size, im_size = 68, 1
+duplicat_count = 0
+
+for map_size in [68]:
+    for im_size in [1, 2, 4]:
+        h2_norm = (h2_trans - h2_trans.min()) / (h2_trans.max() - h2_trans.min())
+        h2_norm = (h2_norm - 0.5) * (map_size / im_size)
+        gc.collect()
+        duplicat_count = 0
+        hmin, hmax = h2_norm.min(), h2_norm.max()
+        width = np.ceil(hmax-hmin).astype(int) + 1
+        wall = np.zeros([img_rows*width, img_cols*width, 3], dtype=np.uint8)
+        for s in range(h2_norm.shape[0]):
+            xy = np.int_(h2_norm[s]-hmin)
+            x, y = xy[0]*img_rows, xy[1]*img_cols
+            if wall[x:x+img_rows, y:y+img_cols].sum() > 0:
+                duplicat_count += 1
+            else:
+                wall[x:x+img_rows, y:y+img_cols] = cv2.resize(samples[s], (img_rows, img_cols)) * 255
+
+        wall[wall < 0  ] = 0
+        wall[wall > 255] = 255
+        print('found %i masked images' %duplicat_count)
+        # img_grid = img.reshape(input_shape[0]*10, input_shape[1]*10, 1)
+        fname = 'prod/tsne_wall_%icm_feuilles_%icm.png' %(map_size, im_size)
+        img = Image.fromarray(wall)
+        print('saving map in ' + fname)
+        img.save(fname, optimize=True)
+        # cv2.imwrite(fname, wall)
+        del wall
+
+del samples, h2_trans
+gc.collect()
+# im = Image.fromarray(wall)
+print('saving map in ' + fname)
+# im.save(fname, optimize=True)
+cv2.imwrite(fname, wall)
+
 
 stop
 

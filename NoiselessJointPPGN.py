@@ -444,11 +444,25 @@ class NoiselessJointPPGN:
         #Create a TF function for the fwd/bwd pass.
         #This is a bit of keras/TF dark magic, bear with me
         #Also see https://github.com/keras-team/keras/issues/2226
-        conditional = K.log(self.sampler.outputs[0][:,neuronID])
+        conditional = K.log(self.sampler.outputs[0][:, neuronID])
         input_h2 = self.sampler.inputs[0]
         learning_phase = K.learning_phase()
         grads = K.gradients(conditional, [input_h2])
         self.fwd_bwd_pass = K.function([input_h2, learning_phase], grads)
+
+    def sampler_init_all(self, num_classes=16):
+        self._sampling_init = True
+        #Create a TF function for the fwd/bwd pass.
+        #This is a bit of keras/TF dark magic, bear with me
+        #Also see https://github.com/keras-team/keras/issues/2226
+        self.fwd_bwd_pass = []
+        for i in range(num_classes):
+            conditional = K.log(self.sampler.outputs[0][:, neuronID])
+            input_h2 = self.sampler.inputs[0]
+            learning_phase = K.learning_phase()
+            grads = K.gradients(conditional, [input_h2])
+            f = K.function([input_h2, learning_phase], grads)
+            self.fwd_bwd_pass.append(f)
 
     def sample(self, neuronID, epsilons=(1e-11, 1, 1e-17), nbSamples=100, h2_start=None, report_freq=10,
                lr=1e24, lr_end=1e24, use_lr=True):

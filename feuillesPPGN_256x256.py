@@ -19,10 +19,10 @@ import matplotlib.pyplot as plt
 
 # Data augmentation parameters
 zoom_range = 0.2
-rotation_range = 30
+rotation_range = 0
 #Test on dataset les Feuilles
 batch_size = 64
-num_classes = 15
+num_classes = 16
 n_epochs = 10
 # input image dimensions
 img_rows, img_cols = 256, 256
@@ -90,7 +90,7 @@ if not skipFitGAN:
     #            save_freq=500, report_freq=10, train_procedure=deepSimTrain)
                 #save_freq=100, report_freq=10, train_procedure=customGANTrain)
     src, gen = ppgn.fit_gan_from_directory(gan_gen, data_path, fname=output_name,
-                target_size=(img_rows, img_cols), batch_size=64, epochs=30000,
+                target_size=(img_rows, img_cols), batch_size=64, epochs=120000,
                 save_freq=500, report_freq=100, train_procedure=deepSimTrain)#, starting_epoch=45000)#, save_img_dir='augmented')
     # Plot some GAN metrics computed during fit
     plt.ion()

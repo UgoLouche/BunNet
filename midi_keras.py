@@ -13,8 +13,8 @@ from models import dcgan_128generator, dcgan_256generator
 
 #Test on dataset les Feuilles
 batch_size = 64
-num_classes = 15
-epochs = 15
+num_classes = 16
+epochs = 10
 # # input image dimensions
 # img_rows, img_cols = 64, 64
 # # Classifier
@@ -39,9 +39,9 @@ ppgn = PPGN.NoiselessJointPPGN(model, 19, 20, 23, verbose=1,
 # ppgn.classifier.load_weights('weights/cnn7_ultralight_rgb256_aug_10epo.h5')
 # ppgn.g_gen.load_weights('weights/g_gen_dcgan_rbg256_deepsim_noisy_068000.h5')
 # ppgn.g_disc.load_weights('weights/g_disc_dcgan_rbg256_deepsim_noisy_068000.h5')
-model.load_weights('weights/cnn7_ultralight_rgb256_aug_rot30_zoom20_10epo.h5')
-g_gen.load_weights('weights/g_gen_rgb256_aug_rot30_zoom20_029000.h5')
-g_disc.load_weights('weights/g_disc_rgb256_aug_rot30_zoom20_029000.h5')
+model.load_weights('weights/cnn7_ultralight_rgb256_aug_rot0_zoom20_10epo.h5')
+g_gen.load_weights('weights/g_gen_rgb256_aug_rot0_zoom20_077000.h5')
+g_disc.load_weights('weights/g_disc_rgb256_aug_rot0_zoom20_077000.h5')
 
 ppgn.compile(clf_metrics=['accuracy'],
              gan_loss_weight=[10, 2, 1e-1]) #[1, 2, 1e-1])
