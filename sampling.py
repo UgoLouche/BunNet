@@ -11,16 +11,13 @@ def online_sampling(ppgn, im=None, save_dir=None, class_names=None,
 
     i_img, neuronId, counter = 0, 0, 0
     h2_base = None
-    ppgn.sampler_init(neuronId)
+    ppgn.sampler_init(num_classes)
     while True:
-        h2_base = None
-        new_neuronId = random.randint(0, num_classes-1)
-        if neuronId != new_neuronId:
-            neuronId = new_neuronId
-            ppgn.sampler_init(neuronId)
+        # h2_base = None
+        neuronId = random.randint(0, num_classes-1)
         iter_count = 0
         tstart = time.time()
-        while counter < 50:
+        while counter < 10:
             iter_count += 1
             sample, h2 = ppgn.sample(neuronId, nbSamples=1,
                                  h2_start=h2_base,
@@ -37,7 +34,11 @@ def online_sampling(ppgn, im=None, save_dir=None, class_names=None,
                     counter += 1
                 if im is not None:
                     im.set_data(img)#[:, :, 0])#, vmin=0, vmax=16)
-                    plt.title('counter=%04d, prob=%.3f' %(i_img, prob[neuronId]))
+                    if class_names is not None:
+                        cname = class_names[neuronId].replace(' ', '_')[:-1]
+                    else:
+                        cname = 'class=%i'
+                    plt.title(cname + ' prob=%.3f' %(prob[neuronId]))
                     plt.pause(0.01)
 
         if save_dir is not None:
@@ -68,12 +69,12 @@ def random_sampling(n_img, ppgn, im=None, save_dir=None, class_names=None,
     h2_values = np.zeros([n_img, h_len])
     i_img, neuronId, counter = 0, 0, 0
     h2_base = None
-    ppgn.sampler_init(neuronId)
+    ppgn.sampler_init(num_classes)
     while i_img < n_img:
         h2_base = None
         if neuronId != int(np.floor(i_img/(n_img/num_classes))):
             neuronId = int(np.floor(i_img/(n_img/num_classes)))
-            ppgn.sampler_init(neuronId)
+            # ppgn.sampler_init(neuronId)
         iter_count = 0
         tstart = time.time()
         while counter < 30:
@@ -93,7 +94,11 @@ def random_sampling(n_img, ppgn, im=None, save_dir=None, class_names=None,
                     counter += 1
                 if im is not None:
                     im.set_data(img)#[:, :, 0])#, vmin=0, vmax=16)
-                    plt.title('counter=%04d, prob=%.3f' %(i_img, prob[neuronId]))
+                    if class_names is not None:
+                        cname = class_names[neuronId].replace(' ', '_')[:-1]
+                    else:
+                        cname = 'class=%i'
+                    plt.title(cname + ' prob=%.3f' %(prob[neuronId]))
                     plt.pause(0.01)
 
         print('sampling class %i in %.3fs (%i iterations) ' %(neuronId, (time.time()-tstart), iter_count))
@@ -157,7 +162,7 @@ def categorical_sampling(n_img, neuronId, ppgn, im=None,
         num_classes=16, img_rows=64, img_cols=64, h_len=2048):
     samples = np.zeros([n_img, img_rows, img_cols, 3], dtype=np.uint8)
     h2_values = np.zeros([n_img, h_len])
-    ppgn.sampler_init(neuronId)
+    ppgn.sampler_init(num_classes)
     i_img, i_class, counter = 0, 0, 1000
     h2_base = None
     change_class = False
@@ -167,7 +172,7 @@ def categorical_sampling(n_img, neuronId, ppgn, im=None,
             if reset_category:
                 neuronId = random.randint(0, num_classes-1)
                 print('setting class %i' %neuronId)
-                ppgn.sampler_init(neuronId)
+                #ppgn.sampler_init(neuronId)
             else:
                 print('-----')
             counter = 0

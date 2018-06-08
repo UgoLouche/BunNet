@@ -439,24 +439,25 @@ class NoiselessJointPPGN:
 
         return (source_samples, generated_samples)
 
-    def sampler_init(self, neuronID):
-        self._sampling_init = True
-        #Create a TF function for the fwd/bwd pass.
-        #This is a bit of keras/TF dark magic, bear with me
-        #Also see https://github.com/keras-team/keras/issues/2226
-        conditional = K.log(self.sampler.outputs[0][:, neuronID])
-        input_h2 = self.sampler.inputs[0]
-        learning_phase = K.learning_phase()
-        grads = K.gradients(conditional, [input_h2])
-        self.fwd_bwd_pass = K.function([input_h2, learning_phase], grads)
+    # def sampler_init(self, neuronID):
+    #     self._sampling_init = True
+    #     #Create a TF function for the fwd/bwd pass.
+    #     #This is a bit of keras/TF dark magic, bear with me
+    #     #Also see https://github.com/keras-team/keras/issues/2226
+    #     conditional = K.log(self.sampler.outputs[0][:, neuronID])
+    #     input_h2 = self.sampler.inputs[0]
+    #     learning_phase = K.learning_phase()
+    #     grads = K.gradients(conditional, [input_h2])
+    #     self.fwd_bwd_pass = K.function([input_h2, learning_phase], grads)
 
-    def sampler_init_all(self, num_classes=16):
+    def sampler_init(self, num_classes=16):
         self._sampling_init = True
         #Create a TF function for the fwd/bwd pass.
         #This is a bit of keras/TF dark magic, bear with me
         #Also see https://github.com/keras-team/keras/issues/2226
         self.fwd_bwd_pass = []
-        for i in range(num_classes):
+        for neuronID in range(num_classes):
+            self._log('Gradient initialization for class %i' %neuronID, 0)
             conditional = K.log(self.sampler.outputs[0][:, neuronID])
             input_h2 = self.sampler.inputs[0]
             learning_phase = K.learning_phase()
@@ -478,8 +479,8 @@ class NoiselessJointPPGN:
                       .format(h2_start.shape, self.sampler.input_shape), 0)
             return
 
-        if not self._sampling_init:
-            self.sampler_init(neuronID)
+        assert self._sampling_init, 'Sampling procedure not initialized (call self._sampling_init)'
+        assert neuronID < len(self.fwd_bwd_pass), 'Wrong initialisation, no gradient found for class %i' %neuronID
         # #Create a TF function for the fwd/bwd pass.
         # #This is a bit of keras/TF dark magic, bear with me
         # #Also see https://github.com/keras-team/keras/issues/2226
@@ -500,7 +501,7 @@ class NoiselessJointPPGN:
             self._log("L2-norm of term0={}".format(np.linalg.norm(term0)), 2)
 
             #term1 is the gradient after a fwd/bwd pass
-            term1 = self.fwd_bwd_pass([h2, 0])[0]
+            term1 = self.fwd_bwd_pass[neuronID]([h2, 0])[0]
             term1 *= epsilons[1]
             self._log("L2-norm of term1={}".format(np.linalg.norm(term1)), 2)
 

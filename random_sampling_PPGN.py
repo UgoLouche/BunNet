@@ -57,51 +57,23 @@ ppgn.compile(clf_metrics=['accuracy'],
 with open('class_names.txt') as f:
     class_names = f.readlines()
 
-# go back to 64x64 for vizualisation
-epsilons = (0.5, 1, 1e-5)
+# epsilons = (0.5, 1, 1e-5)
+# epsilons = (0.5, 1, 5e-4)
+epsilons = (0.5, 2, 1e-2)
+lr = 1e-2
 img_rows, img_cols = 256, 256#64, 64 #
-n_img, i_img = 2000, 0
-i_class = 0
 h2_base = None
 map_count = 0
+
+s = 'lr%.2e_' %lr + 'eps_%.2e_%.2e_%.2e_' %epsilons + time.ctime()
+save_dir = 'prod/' + s.replace(' ','_').replace(':','_')
+os.mkdir(save_dir)
+os.mkdir(save_dir + '/img')
+os.mkdir(save_dir + '/code')
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
 im = ax.imshow(np.zeros([img_rows, img_cols, 3]))
 
-online_sampling(ppgn, im, epsilons=epsilons, lr=1e-2, img_rows=256, img_cols=256)
-#while True:
-#    samples, h2_values = random_sampling(n_img, ppgn)#, img_rows=256, img_cols=256)
-#    samples, h2_values = categorical_sampling(n_img, 10, ppgn, im)
-for i_class in range(num_classes):
-    samples, h2_values = categorical_sampling(n_img, i_class, ppgn, im,
-                            epsilons=epsilons, lr=1e-2, img_rows=256, img_cols=256)
-    print('fitting a TSNE representation of h2...')
-    duplicat_count = 0
-    try:
-        h2_trans = tsne.fit_transform(h2_values)
-        hmin, hmax = h2_trans.min(), h2_trans.max()
-        width = np.ceil(hmax-hmin).astype(int)
-        wall = np.zeros([img_rows*width, img_cols*width, 3], dtype=np.uint8)
-        for s in range(len(samples)):
-            xy = np.int_(h2_trans[s]-hmin)
-            x, y = xy[0]*img_rows, xy[1]*img_cols
-            if wall[x:x+img_rows, y:y+img_cols].sum() > 0:
-                duplicat_count += 1
-            else:
-                wall[x:x+img_rows, y:y+img_cols] = samples[s]
-
-        wall[wall < 0  ] = 0
-        wall[wall > 255] = 255
-        print('found %i masked images' %duplicat_count)
-        # img_grid = img.reshape(input_shape[0]*10, input_shape[1]*10, 1)
-        cname = class_names[i_class].replace(' ', '_')[:-1]
-        fname = 'img/tsne_wall_%s_eps%i_%ifeuilles.png' %(cname, np.log10(epsilons[-1]), n_img)
-        print('saving map in ' + fname)
-        # im.save(fname, optimize=True)
-        cv2.imwrite(fname, wall)
-    except MemoryError:
-        print('Memory Error, skipping TSNE')
-
-    map_count += 1
-    gc.collect()
+online_sampling(ppgn, im=im, epsilons=epsilons, lr=lr,
+            img_rows=256, img_cols=256, save_dir=save_dir, class_names=class_names)
