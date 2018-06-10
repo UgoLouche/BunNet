@@ -60,7 +60,7 @@ with open('class_names.txt') as f:
 # epsilons = (0.5, 1, 1e-5)
 # epsilons = (0.5, 1, 5e-4)
 epsilons = (0.5, 2, 1e-2)
-lr = 1e-2
+lr = 8e-3
 img_rows, img_cols = 256, 256#64, 64 #
 h2_base = None
 map_count = 0

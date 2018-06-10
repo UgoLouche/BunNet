@@ -1,9 +1,15 @@
 import keras
+import keras.backend as K
 import random, cv2, gc, time
 import sys, os, h5py
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
+import psutil, timeit
+
+def get_mem_usage():
+    process = psutil.Process(os.getpid())
+    return process.memory_info()
 
 def online_sampling(ppgn, im=None, save_dir=None, class_names=None,
         epsilons=(0.5, 1, 1e-15), lr=1e-1, reset_category=False,
@@ -32,6 +38,8 @@ def online_sampling(ppgn, im=None, save_dir=None, class_names=None,
                 h2_base = h2[-1]
                 if prob[neuronId] > 0.99:
                     counter += 1
+                elif iter_count > 3000:
+                    h2_base = None
                 if im is not None:
                     im.set_data(img)#[:, :, 0])#, vmin=0, vmax=16)
                     if class_names is not None:
@@ -57,6 +65,8 @@ def online_sampling(ppgn, im=None, save_dir=None, class_names=None,
             np.savetxt(cname, h2[-1], delimiter=';')
 
         gc.collect()
+        print('%.1f %% memory used' %psutil.virtual_memory().percent)
+        # K.clear_session()
         i_img += 1
         counter = 0
 
